@@ -755,6 +755,32 @@ struct SettingsView: View {
                         set: { settings.hidePopupAfterDrag = $0 }
                     )
                 )
+                featureToggleRow(
+                    icon: "lock.shield",
+                    titleKey: "otp_feature_enable",
+                    isOn: Binding(
+                        get: { settings.enableOTP },
+                        set: { settings.enableOTP = $0 }
+                    )
+                )
+                if settings.enableOTP {
+                    settingsCard {
+                        HStack {
+                            Label(localization.localizedString("otp_grace_period"), systemImage: "clock")
+                                .font(.system(size: 12, weight: .medium))
+                            Spacer()
+                            Picker("", selection: Binding(
+                                get: { settings.otpGracePeriodMinutes },
+                                set: { settings.otpGracePeriodMinutes = $0 }
+                            )) {
+                                Text(localization.localizedString("otp_grace_1")).tag(1)
+                                Text(localization.localizedString("otp_grace_5")).tag(5)
+                                Text(localization.localizedString("otp_grace_15")).tag(15)
+                            }
+                            .labelsHidden().frame(width: 120)
+                        }
+                    }
+                }
             }
             .padding(16)
         }

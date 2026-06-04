@@ -33,6 +33,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         #if DEBUG
         OTPItem.runSelfCheck()
+        OTPCrypto.runSelfCheck()
         #endif
 
         // Detect stale TCC sau update: ad-hoc signed app có CDHash đổi mỗi build →
