@@ -16,6 +16,7 @@ enum OTPCrypto {
     enum CryptoError: Error { case badFormat, wrongPassphrase, derivation }
 
     static func deriveKey(passphrase: String, salt: Data, iterations: UInt32) throws -> SymmetricKey {
+        guard !passphrase.isEmpty else { throw CryptoError.derivation }
         var derived = Data(count: keyLength)
         let pwData = Data(passphrase.utf8)
         let status = derived.withUnsafeMutableBytes { derivedPtr in
@@ -39,7 +40,8 @@ enum OTPCrypto {
     static func encrypt(_ items: [OTPItem], passphrase: String) throws -> Data {
         let plaintext = try JSONEncoder().encode(items)
         var salt = Data(count: saltLength)
-        _ = salt.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, saltLength, $0.baseAddress!) }
+        let rc = salt.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, saltLength, $0.baseAddress!) }
+        guard rc == errSecSuccess else { throw CryptoError.derivation }   // RNG lỗi → không tạo salt 0
         let key = try deriveKey(passphrase: passphrase, salt: salt, iterations: iterations)
         let sealed = try AES.GCM.seal(plaintext, using: key)
         guard let combined = sealed.combined else { throw CryptoError.badFormat }
@@ -64,8 +66,12 @@ enum OTPCrypto {
         guard Array(try take(4)) == magic else { throw CryptoError.badFormat }
         let ver = try take(1).first ?? 0
         guard ver == version else { throw CryptoError.badFormat }
-        let iterBE = try take(4).withUnsafeBytes { $0.load(as: UInt32.self) }
-        let iters = UInt32(bigEndian: iterBE)
+        // memcpy: tránh load(as:) trên con trỏ không căn chỉnh 4-byte (UB trên arm64).
+        var iterRaw: UInt32 = 0
+        _ = try take(4).withUnsafeBytes { memcpy(&iterRaw, $0.baseAddress!, 4) }
+        let iters = UInt32(bigEndian: iterRaw)
+        // Chặn blob độc hại đặt iterations khổng lồ (treo main thread khi import) hoặc quá nhỏ (khóa yếu).
+        guard iters >= 100_000, iters <= 10_000_000 else { throw CryptoError.badFormat }
         let salt = try take(saltLength)
         let combined = data.subdata(in: idx..<data.count)
 
