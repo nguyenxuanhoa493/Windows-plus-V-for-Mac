@@ -398,8 +398,113 @@ struct SettingsView: View {
                             }
                     }
                 }
+
+                // Vị trí popup so với con trỏ — lưới 3x3 + live preview
+                settingsCard {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label(localization.localizedString("popup_position"), systemImage: "macwindow")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.secondary)
+                        Text(localization.localizedString("popup_position_hint"))
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary.opacity(0.7))
+
+                        HStack(alignment: .center, spacing: 18) {
+                            popupPositionGrid
+                            PopupAnchorPreview(anchor: settings.popupAnchor, accent: settings.themedAccent)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.top, 4)
+                    }
+                }
+
+                // Toggle hiện/ẩn dòng thông tin dưới mỗi item
+                settingsCard {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Label(localization.localizedString("show_item_info_line"), systemImage: "info.circle")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.secondary)
+                            Text(localization.localizedString("show_item_info_line_hint"))
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary.opacity(0.8))
+                        }
+                        Spacer()
+                        Toggle("", isOn: Binding(
+                            get: { settings.showItemInfoLine },
+                            set: { settings.showItemInfoLine = $0 }
+                        ))
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                        .labelsHidden()
+                    }
+                }
             }
             .padding(16)
+        }
+    }
+
+    // MARK: - Popup position picker
+
+    /// Ánh xạ (hàng, cột) của lưới 3x3 sang hướng. (1,1) = nil = con trỏ ở tâm.
+    private func popupAnchorAt(row: Int, col: Int) -> PopupAnchor? {
+        switch (row, col) {
+        case (0, 0): return .topLeft
+        case (0, 1): return .top
+        case (0, 2): return .topRight
+        case (1, 0): return .left
+        case (1, 2): return .right
+        case (2, 0): return .bottomLeft
+        case (2, 1): return .bottom
+        case (2, 2): return .bottomRight
+        default: return nil
+        }
+    }
+
+    private var popupPositionGrid: some View {
+        VStack(spacing: 4) {
+            ForEach(0..<3, id: \.self) { row in
+                HStack(spacing: 4) {
+                    ForEach(0..<3, id: \.self) { col in
+                        popupGridCell(row: row, col: col)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func popupGridCell(row: Int, col: Int) -> some View {
+        let cell: CGFloat = 30
+        if let anchor = popupAnchorAt(row: row, col: col) {
+            let isSelected = settings.popupAnchor == anchor
+            Button(action: { settings.popupAnchor = anchor }) {
+                Image(systemName: anchor.iconName)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(isSelected ? .white : .secondary)
+                    .frame(width: cell, height: cell)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(isSelected ? settings.themedAccent : Color(NSColor.controlBackgroundColor))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(isSelected ? settings.themedAccent : Color(NSColor.separatorColor),
+                                    lineWidth: isSelected ? 1.5 : 0.5)
+                    )
+            }
+            .buttonStyle(.plain)
+        } else {
+            // Ô trung tâm = con trỏ chuột
+            Image(systemName: "cursorarrow")
+                .font(.system(size: 12))
+                .foregroundColor(.secondary.opacity(0.6))
+                .frame(width: cell, height: cell)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color(NSColor.separatorColor).opacity(0.5),
+                                style: StrokeStyle(lineWidth: 0.5, dash: [2, 2]))
+                )
         }
     }
 
@@ -745,4 +850,64 @@ struct SettingsView: View {
         .help(theme.displayName)
     }
 
+}
+
+/// Khung minh họa động: con trỏ ở tâm, hộp thoại vẽ theo hướng đang chọn.
+/// Toạ độ SwiftUI có y hướng xuống nên "trên" = y nhỏ hơn tâm.
+struct PopupAnchorPreview: View {
+    let anchor: PopupAnchor
+    let accent: Color
+
+    private let boardW: CGFloat = 150
+    private let boardH: CGFloat = 104
+
+    var body: some View {
+        let pw = boardW * 0.42
+        let ph = boardH * 0.42
+        let cx = boardW / 2
+        let cy = boardH / 2
+
+        let px: CGFloat = {
+            switch anchor.horizontal {
+            case .leading:  return cx - pw
+            case .center:   return cx - pw / 2
+            case .trailing: return cx
+            }
+        }()
+        let py: CGFloat = {
+            switch anchor.vertical {
+            case .top:    return cy - ph   // hộp thoại phía trên con trỏ
+            case .middle: return cy - ph / 2
+            case .bottom: return cy        // hộp thoại phía dưới con trỏ
+            }
+        }()
+
+        return ZStack {
+            // Nền tượng trưng cho màn hình
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(NSColor.windowBackgroundColor))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(NSColor.separatorColor), lineWidth: 0.5)
+                )
+
+            // Hộp thoại lịch sử
+            RoundedRectangle(cornerRadius: 5)
+                .fill(accent.opacity(0.22))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 5).stroke(accent, lineWidth: 1.2)
+                )
+                .frame(width: pw, height: ph)
+                .position(x: px + pw / 2, y: py + ph / 2)
+
+            // Con trỏ chuột ở tâm
+            Image(systemName: "cursorarrow")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundColor(.primary)
+                .shadow(color: Color(NSColor.windowBackgroundColor), radius: 1)
+                .position(x: cx, y: cy)
+        }
+        .frame(width: boardW, height: boardH)
+        .animation(.easeInOut(duration: 0.18), value: anchor)
+    }
 }

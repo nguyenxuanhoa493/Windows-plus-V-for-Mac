@@ -907,6 +907,7 @@ struct ClipboardItemView: View {
                     }
                 }
                 
+                if settings.showItemInfoLine {
                 HStack(spacing: 6) {
                     Text("\(index)")
                         .font(.system(size: 9, weight: .bold))
@@ -915,7 +916,7 @@ struct ClipboardItemView: View {
                         .frame(minWidth: 14, minHeight: 14)
                         .background(settings.themedAccent.opacity(0.8))
                         .cornerRadius(3)
-                    
+
                     if item.isPinned {
                         Image(systemName: "pin.fill")
                             .font(.system(size: 10))
@@ -962,6 +963,7 @@ struct ClipboardItemView: View {
                     Text(item.timeString)
                         .font(.system(size: 11))
                         .foregroundColor(settings.themedForeground.opacity(0.65))
+                }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

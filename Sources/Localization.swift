@@ -106,6 +106,7 @@ class Localization: ObservableObject {
         "perm_step_1": [.english: "Click 'Open System Settings'", .vietnamese: "Click nút 'Mở System Settings'"],
         "perm_step_2": [.english: "Find 'Clipboard' and toggle on", .vietnamese: "Tìm 'Clipboard' và bật toggle"],
         "perm_step_3": [.english: "Return to the app — this window will close automatically", .vietnamese: "Quay lại app - cửa sổ sẽ tự đóng"],
+        "perm_stale_hint": [.english: "After update, you may need to remove Clipboard from the list and re-add it from /Applications/Clipboard.app", .vietnamese: "Sau khi update, có thể cần xoá Clipboard khỏi list rồi add lại từ /Applications/Clipboard.app"],
         "perm_open_settings": [.english: "Open System Settings", .vietnamese: "Mở System Settings"],
         "perm_quit_app": [.english: "Quit application", .vietnamese: "Thoát ứng dụng"],
         "perm_auto_close": [.english: "This window will close automatically once you grant permission", .vietnamese: "Cửa sổ này sẽ tự động đóng khi bạn cấp quyền"],
@@ -115,6 +116,10 @@ class Localization: ObservableObject {
         "feature_privacy_disclaimer": [.english: "Clipboard history is stored unencrypted in UserDefaults. Avoid using this app for passwords or sensitive secrets.", .vietnamese: "Lịch sử clipboard lưu plaintext trong UserDefaults. Không nên dùng app này cho mật khẩu hoặc dữ liệu nhạy cảm."],
         "use_native_ui": [.english: "Native macOS UI", .vietnamese: "Giao diện native macOS"],
         "use_native_ui_hint": [.english: "Compact list style without custom cards", .vietnamese: "Danh sách gọn theo style hệ thống, không dùng card tuỳ chỉnh"],
+        "popup_position": [.english: "Popup position", .vietnamese: "Vị trí hộp thoại"],
+        "popup_position_hint": [.english: "Where the history popup appears relative to the cursor", .vietnamese: "Hộp thoại lịch sử sẽ xuất hiện ở đâu so với con trỏ chuột"],
+        "show_item_info_line": [.english: "Show item info line", .vietnamese: "Hiện dòng thông tin của item"],
+        "show_item_info_line_hint": [.english: "Index, badges, source app and time below each item", .vietnamese: "Số thứ tự, badge, app nguồn và thời gian dưới mỗi item"],
         "color_theme": [.english: "Color theme", .vietnamese: "Bộ màu"],
         "color_theme_hint": [.english: "Accent color used across the app", .vietnamese: "Màu accent dùng xuyên suốt app"],
         // Tabs

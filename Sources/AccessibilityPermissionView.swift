@@ -84,6 +84,18 @@ struct AccessibilityPermissionView: View {
                     InstructionStep(number: "1", text: Localization.shared.localizedString("perm_step_1"))
                     InstructionStep(number: "2", text: Localization.shared.localizedString("perm_step_2"))
                     InstructionStep(number: "3", text: Localization.shared.localizedString("perm_step_3"))
+
+                    // Stale entry hint (sau update có thể cần xoá-add lại)
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.orange)
+                            .font(.system(size: 12))
+                        Text(Localization.shared.localizedString("perm_stale_hint"))
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.top, 4)
                 }
                 .padding(16)
                 .background(Color(NSColor.controlBackgroundColor))

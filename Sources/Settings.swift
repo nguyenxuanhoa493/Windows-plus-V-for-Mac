@@ -31,6 +31,65 @@ enum AppFontDesign: String, CaseIterable {
     }
 }
 
+/// Vị trí hộp thoại lịch sử xuất hiện so với con trỏ chuột.
+/// Con trỏ nằm ở tâm lưới 3x3, 8 case = 8 hướng xung quanh.
+enum PopupAnchor: String, CaseIterable {
+    case topLeft, top, topRight
+    case left, right
+    case bottomLeft, bottom, bottomRight
+
+    enum Horizontal { case leading, center, trailing }
+    enum Vertical { case top, middle, bottom }
+
+    var horizontal: Horizontal {
+        switch self {
+        case .topLeft, .left, .bottomLeft: return .leading
+        case .top, .bottom: return .center
+        case .topRight, .right, .bottomRight: return .trailing
+        }
+    }
+
+    var vertical: Vertical {
+        switch self {
+        case .topLeft, .top, .topRight: return .top
+        case .left, .right: return .middle
+        case .bottomLeft, .bottom, .bottomRight: return .bottom
+        }
+    }
+
+    /// SF Symbol mũi tên minh họa hướng (đều có từ macOS 11).
+    var iconName: String {
+        switch self {
+        case .topLeft: return "arrow.up.left"
+        case .top: return "arrow.up"
+        case .topRight: return "arrow.up.right"
+        case .left: return "arrow.left"
+        case .right: return "arrow.right"
+        case .bottomLeft: return "arrow.down.left"
+        case .bottom: return "arrow.down"
+        case .bottomRight: return "arrow.down.right"
+        }
+    }
+
+    /// Tính origin (góc bottom-left của NSWindow — hệ toạ độ AppKit y hướng lên)
+    /// từ vị trí con trỏ và kích thước popup.
+    func origin(cursor: CGPoint, size: CGSize) -> CGPoint {
+        let x: CGFloat
+        switch horizontal {
+        case .leading:  x = cursor.x - size.width
+        case .center:   x = cursor.x - size.width / 2
+        case .trailing: x = cursor.x
+        }
+        let y: CGFloat
+        switch vertical {
+        case .top:    y = cursor.y                   // popup nằm phía trên con trỏ
+        case .middle: y = cursor.y - size.height / 2
+        case .bottom: y = cursor.y - size.height      // popup nằm phía dưới con trỏ
+        }
+        return CGPoint(x: x, y: y)
+    }
+}
+
 extension Notification.Name {
     static let shortcutChanged = Notification.Name("shortcutChanged")
     /// Posted sau khi Settings window đã hiển thị. `object` = NSWindow.
@@ -184,7 +243,17 @@ class Settings: ObservableObject {
     @Published var hidePopupAfterDrag: Bool {
         didSet { UserDefaults.standard.set(hidePopupAfterDrag, forKey: "feature_hidePopupAfterDrag") }
     }
-    
+
+    /// Vị trí popup so với con trỏ chuột (mặc định dưới-phải = giữ behavior cũ).
+    @Published var popupAnchor: PopupAnchor {
+        didSet { UserDefaults.standard.set(popupAnchor.rawValue, forKey: "popupAnchor") }
+    }
+
+    /// Hiện dòng thông tin (số thứ tự, badge, app nguồn, thời gian) dưới mỗi item.
+    @Published var showItemInfoLine: Bool {
+        didSet { UserDefaults.standard.set(showItemInfoLine, forKey: "feature_showItemInfoLine") }
+    }
+
     func applyTheme() {
         // Áp dụng appearance theo appTheme (nil = system, .aqua/.darkAqua = ép cứng)
         if let preferred = appTheme.preferredAppearance {
@@ -278,7 +347,8 @@ class Settings: ObservableObject {
             default: self.appTheme = .system  // "system" + "custom"
             }
         } else {
-            self.appTheme = .system
+            // Mặc định cho cài đặt mới: theme tím Dracula
+            self.appTheme = .dracula
         }
 
         // Font design (default: system)
@@ -292,6 +362,14 @@ class Settings: ObservableObject {
         // Font size (default: 13, range 10-16)
         let savedSize = UserDefaults.standard.integer(forKey: "appFontSize")
         self.appFontSize = (10...16).contains(savedSize) ? savedSize : 13
+
+        // Vị trí popup so với con trỏ (default: dưới-phải)
+        if let raw = UserDefaults.standard.string(forKey: "popupAnchor"),
+           let anchor = PopupAnchor(rawValue: raw) {
+            self.popupAnchor = anchor
+        } else {
+            self.popupAnchor = .bottomRight
+        }
         
         // Khởi tạo shortcutKey và shortcutString
         self.shortcutKey = UserDefaults.standard.string(forKey: "shortcutKey") ?? "⌘V"
@@ -317,6 +395,7 @@ class Settings: ObservableObject {
         self.enableDragAndDrop = loadBool("feature_enableDragAndDrop", default: true)
         self.enableNumberShortcuts = loadBool("feature_enableNumberShortcuts", default: true)
         self.hidePopupAfterDrag = loadBool("feature_hidePopupAfterDrag", default: true)
+        self.showItemInfoLine = loadBool("feature_showItemInfoLine", default: true)
     }
     
     func requestAccessibilityPermission() {
