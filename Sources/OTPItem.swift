@@ -24,8 +24,8 @@ struct OTPItem: Codable, Identifiable, Equatable {
         self.issuer = issuer
         self.secret = secret
         self.algorithm = algorithm
-        self.digits = digits
-        self.period = period
+        self.digits = max(1, min(8, digits))   // RFC: 6–8; chặn overflow UInt32 (digits>=10) và digits=0
+        self.period = max(1, period)            // chặn chia cho 0 → crash
         self.createdAt = createdAt
     }
 
@@ -84,6 +84,7 @@ struct OTPItem: Codable, Identifiable, Equatable {
                 output.append(UInt8((value >> bits) & 0xff))
             }
         }
+        guard !output.isEmpty else { return nil }   // "A" decode ra 0 byte → secret không hợp lệ
         return Data(output)
     }
 
@@ -108,7 +109,8 @@ struct OTPItem: Codable, Identifiable, Equatable {
         var name = label
         if label.contains(":") {
             let parts = label.split(separator: ":", maxSplits: 1).map(String.init)
-            if issuer == nil { issuer = parts[0].trimmingCharacters(in: .whitespaces) }
+            let candidate = parts[0].trimmingCharacters(in: .whitespaces)
+            if issuer == nil, !candidate.isEmpty { issuer = candidate }
             name = parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespaces) : label
         }
         if name.isEmpty { name = issuer ?? "OTP" }
