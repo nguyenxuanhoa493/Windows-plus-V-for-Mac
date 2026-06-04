@@ -39,25 +39,30 @@ final class OTPManager: ObservableObject {
     }
 
     // MARK: - CRUD
-    func add(_ item: OTPItem) {
-        // Chống trùng theo secret (bỏ qua nếu đã có secret giống hệt).
+    /// Trả false nếu trùng secret (không thêm).
+    @discardableResult
+    func add(_ item: OTPItem) -> Bool {
         guard !items.contains(where: { $0.secret == item.secret }) else {
             print("DEBUG: OTP trùng secret, bỏ qua add")
-            return
+            return false
         }
         items.insert(item, at: 0)
         persist()
+        return true
     }
 
-    func update(_ item: OTPItem) {
-        guard let idx = items.firstIndex(where: { $0.id == item.id }) else { return }
+    /// Trả false nếu không tìm thấy id hoặc secret trùng với item khác.
+    @discardableResult
+    func update(_ item: OTPItem) -> Bool {
+        guard let idx = items.firstIndex(where: { $0.id == item.id }) else { return false }
         // Chống trùng secret với item khác (không phải chính nó).
         guard !items.contains(where: { $0.secret == item.secret && $0.id != item.id }) else {
             print("DEBUG: OTP update — secret trùng với item khác, bỏ qua")
-            return
+            return false
         }
         items[idx] = item
         persist()
+        return true
     }
 
     func delete(_ item: OTPItem) {

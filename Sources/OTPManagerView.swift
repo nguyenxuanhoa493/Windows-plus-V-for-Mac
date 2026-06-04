@@ -89,7 +89,8 @@ struct OTPManagerView: View {
             try data.write(to: url)
             statusMessage = "✅"
         } catch {
-            statusMessage = "\(error)"
+            print("DEBUG: OTP export lỗi: \(error)")
+            statusMessage = Localization.shared.localizedString("otp_export_failed")
         }
     }
 
@@ -119,7 +120,7 @@ struct OTPManagerView: View {
 /// Sheet thêm/sửa OTP: nhập tay + nút nhập QR ảnh / chọn vùng màn hình.
 struct OTPEditSheet: View {
     let item: OTPItem?
-    let onSave: (OTPItem) -> Void
+    let onSave: (OTPItem) -> Bool
     @Environment(\.dismiss) private var dismiss
 
     @State private var name = ""
@@ -213,7 +214,10 @@ struct OTPEditSheet: View {
             secret: trimmedSecret, algorithm: algorithm, digits: digits, period: period,
             createdAt: item?.createdAt ?? Date()
         )
-        onSave(result)
-        dismiss()
+        if onSave(result) {
+            dismiss()
+        } else {
+            error = Localization.shared.localizedString("otp_secret_duplicate")
+        }
     }
 }

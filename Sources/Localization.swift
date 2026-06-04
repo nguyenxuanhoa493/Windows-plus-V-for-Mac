@@ -204,6 +204,8 @@ class Localization: ObservableObject {
         "otp_export_warning": [.english: "The file is encrypted with your 6-digit PIN. Keep it safe; losing the PIN means losing the data.", .vietnamese: "File được mã hóa bằng PIN 6 số của bạn. Giữ file an toàn; mất PIN là mất dữ liệu."],
         "otp_import_done": [.english: "Imported %d new item(s)", .vietnamese: "Đã nhập %d mục mới"],
         "otp_import_failed": [.english: "Import failed: wrong PIN or corrupt file", .vietnamese: "Nhập thất bại: sai PIN hoặc file hỏng"],
+        "otp_export_failed": [.english: "Export failed", .vietnamese: "Xuất thất bại"],
+        "otp_secret_duplicate": [.english: "This secret already exists", .vietnamese: "Khóa bí mật này đã tồn tại"],
         "clear_dialog_cancel": [.english: "Cancel", .vietnamese: "Hủy"]
     ]
     
