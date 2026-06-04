@@ -32,7 +32,11 @@ final class OTPAuth {
     // MARK: - PIN
     func setPIN(_ pin: String) {
         var salt = Data(count: 16)
-        _ = salt.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 16, $0.baseAddress!) }
+        let rc = salt.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 16, $0.baseAddress!) }
+        guard rc == errSecSuccess else {
+            print("DEBUG: OTPAuth SecRandomCopyBytes lỗi \(rc) — không lưu PIN")
+            return
+        }
         let hash = Self.hash(pin: pin, salt: salt)
         let record = PINRecord(salt: salt, hash: hash)
         if let data = try? JSONEncoder().encode(record) {
