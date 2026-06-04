@@ -254,6 +254,16 @@ class Settings: ObservableObject {
         didSet { UserDefaults.standard.set(showItemInfoLine, forKey: "feature_showItemInfoLine") }
     }
 
+    /// Bật khu vực quản lý OTP (tab OTP trong popup + menu Quản lý OTP).
+    @Published var enableOTP: Bool {
+        didSet { UserDefaults.standard.set(enableOTP, forKey: "feature_enableOTP") }
+    }
+
+    /// Thời gian giữ mở khóa OTP (phút) trước khi hỏi lại PIN/Touch ID.
+    @Published var otpGracePeriodMinutes: Int {
+        didSet { UserDefaults.standard.set(otpGracePeriodMinutes, forKey: "otpGracePeriodMinutes") }
+    }
+
     func applyTheme() {
         // Áp dụng appearance theo appTheme (nil = system, .aqua/.darkAqua = ép cứng)
         if let preferred = appTheme.preferredAppearance {
@@ -396,6 +406,9 @@ class Settings: ObservableObject {
         self.enableNumberShortcuts = loadBool("feature_enableNumberShortcuts", default: true)
         self.hidePopupAfterDrag = loadBool("feature_hidePopupAfterDrag", default: true)
         self.showItemInfoLine = loadBool("feature_showItemInfoLine", default: true)
+        self.enableOTP = loadBool("feature_enableOTP", default: true)
+        let savedGrace = UserDefaults.standard.integer(forKey: "otpGracePeriodMinutes")
+        self.otpGracePeriodMinutes = [1, 5, 15].contains(savedGrace) ? savedGrace : 5
     }
     
     func requestAccessibilityPermission() {
