@@ -30,12 +30,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         
         print("DEBUG: Ứng dụng đang khởi động...")
-        
-        // Kiểm tra quyền truy cập trợ năng
+
+        #if DEBUG
+        OTPItem.runSelfCheck()
+        #endif
+
+        // Detect stale TCC sau update: ad-hoc signed app có CDHash đổi mỗi build →
+        // csreq trong TCC.db không match → toggle UI hiện ON nhưng AXIsProcessTrusted=false.
+        // Reset entry để user cấp quyền lại từ đầu (consistent UX).
+        let currentVersion = UpdateManager.shared.currentVersion
+        let lastSeenVersion = UserDefaults.standard.string(forKey: "lastSeenVersion")
         let hasAccessibility = AXIsProcessTrusted()
-        print("DEBUG: Trạng thái quyền truy cập: \(hasAccessibility)")
-        
-        if !hasAccessibility {
+        print("DEBUG: Trạng thái quyền truy cập: \(hasAccessibility), version: \(lastSeenVersion ?? "nil") → \(currentVersion)")
+
+        if !hasAccessibility, let last = lastSeenVersion, last != currentVersion {
+            print("DEBUG: Phát hiện stale TCC sau update \(last) → \(currentVersion), reset entry...")
+            resetAccessibilityTCC()
+        }
+        UserDefaults.standard.set(currentVersion, forKey: "lastSeenVersion")
+
+        if !AXIsProcessTrusted() {
             // Hiển thị popup yêu cầu quyền
             print("DEBUG: Không có quyền Accessibility, hiển thị popup...")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -85,7 +99,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 UpdateManager.shared.checkForUpdates(silent: true)
             }
         }
-        
+
+        // Lần đầu mở app → mở luôn cửa sổ Cài đặt cho user.
+        // Delay 0.6s để hiện sau popup Accessibility (0.5s) → Settings nằm trên cùng.
+        if !UserDefaults.standard.bool(forKey: "hasLaunchedBefore") {
+            UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                self?.openSettings()
+            }
+        }
+
         print("DEBUG: Ứng dụng đã khởi động xong")
     }
     
@@ -93,7 +116,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "clipboard", accessibilityDescription: "Clipboard")
+            // SF Symbol "clipboard" chỉ có từ macOS 13 → trên macOS 12 trả về nil khiến
+            // icon menu bar biến mất. Fallback "doc.on.clipboard" (có từ macOS 10.15),
+            // cuối cùng dùng ký tự text để luôn hiển thị được icon.
+            if let image = NSImage(systemSymbolName: "clipboard", accessibilityDescription: "Clipboard")
+                ?? NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "Clipboard") {
+                button.image = image
+            } else {
+                button.title = "📋"
+            }
             button.target = self
             button.action = #selector(statusItemClicked(_:))
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -140,6 +171,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func shortcutChanged() {
         setupHotKey() // Cập nhật lại phím tắt khi có thay đổi
+    }
+
+    /// Reset TCC entry cho Accessibility — dùng khi detect stale entry sau update
+    /// (CDHash đổi → signature requirement không match → toggle UI ON nhưng kernel reject).
+    /// Sau reset, user cấp lại quyền sẽ tạo entry mới với CDHash hiện tại.
+    private func resetAccessibilityTCC() {
+        let bundleId = Bundle.main.bundleIdentifier ?? "com.xuanhoa.clipboard"
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+        process.arguments = ["reset", "Accessibility", bundleId]
+        do {
+            try process.run()
+            process.waitUntilExit()
+            print("DEBUG: tccutil reset Accessibility \(bundleId) — exit \(process.terminationStatus)")
+        } catch {
+            print("DEBUG: tccutil reset error: \(error)")
+        }
     }
 
     @objc private func themeDidChange() {
@@ -382,10 +430,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let mouseLocation = NSEvent.mouseLocation
 
-        // Mặc định: cửa sổ nằm ngay bên dưới và bên phải con trỏ
-        // (NSWindow origin = góc bottom-left → top-left = cursor)
-        var popoverOriginX = mouseLocation.x
-        var popoverOriginY = mouseLocation.y - popoverSize.height
+        // Vị trí popup so với con trỏ theo cấu hình của user (mặc định dưới-phải).
+        // Sau đó vẫn kẹp lại trong màn hình bên dưới để không tràn ra ngoài.
+        let anchorOrigin = Settings.shared.popupAnchor.origin(cursor: mouseLocation, size: popoverSize)
+        var popoverOriginX = anchorOrigin.x
+        var popoverOriginY = anchorOrigin.y
 
         // Giới hạn trong màn hình chứa con trỏ (dùng visibleFrame để tránh đè menu bar / dock)
         let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) }) ?? NSScreen.main
