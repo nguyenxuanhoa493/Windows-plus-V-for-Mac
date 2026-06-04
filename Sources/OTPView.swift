@@ -16,7 +16,7 @@ struct OTPView: View {
     @State private var confirmPin = ""
     @State private var errorMessage = ""
     @State private var now = Date()
-    @State private var lockoutRemaining = 0
+    @State private var lockoutRemaining = OTPAuth.shared.lockoutRemaining
 
     private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -159,6 +159,7 @@ struct OTPView: View {
     private func submitPIN() {
         if auth.isLockedOut {
             lockoutRemaining = auth.lockoutRemaining
+            errorMessage = ""   // chỉ hiện nhãn đếm ngược khóa, bỏ thông báo PIN sai cũ
             pin = ""
             return
         }
