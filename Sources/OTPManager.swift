@@ -30,7 +30,11 @@ final class OTPManager: ObservableObject {
 
     private func persist() {
         guard let data = try? JSONEncoder().encode(items) else { return }
-        KeychainHelper.save(data, account: listAccount)
+        let ok = KeychainHelper.save(data, account: listAccount)
+        if !ok {
+            print("DEBUG: OTPManager persist thất bại — không ghi được Keychain")
+            return   // state trên bộ nhớ ≠ Keychain → không post notification
+        }
         NotificationCenter.default.post(name: .otpListChanged, object: nil)
     }
 
@@ -47,6 +51,11 @@ final class OTPManager: ObservableObject {
 
     func update(_ item: OTPItem) {
         guard let idx = items.firstIndex(where: { $0.id == item.id }) else { return }
+        // Chống trùng secret với item khác (không phải chính nó).
+        guard !items.contains(where: { $0.secret == item.secret && $0.id != item.id }) else {
+            print("DEBUG: OTP update — secret trùng với item khác, bỏ qua")
+            return
+        }
         items[idx] = item
         persist()
     }
