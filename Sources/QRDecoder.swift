@@ -50,7 +50,7 @@ enum QRDecoder {
             try process.run()
         } catch {
             print("DEBUG: screencapture lỗi: \(error)")
-            completion(nil)
+            DispatchQueue.main.async { completion(nil) }   // luôn callback trên main như nhánh thành công
         }
     }
 }
