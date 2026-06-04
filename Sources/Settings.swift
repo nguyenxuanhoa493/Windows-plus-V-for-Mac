@@ -97,6 +97,8 @@ extension Notification.Name {
     static let settingsWindowDidShow = Notification.Name("settingsWindowDidShow")
     /// Posted sau khi Settings.applyTheme() chạy — windows tự cập nhật backgroundColor titlebar.
     static let themeDidChange = Notification.Name("themeDidChange")
+    /// Posted khi bật/tắt khu vực OTP — AppDelegate rebuild status menu.
+    static let otpSettingChanged = Notification.Name("otpSettingChanged")
 }
 
 class Settings: ObservableObject {
@@ -256,7 +258,10 @@ class Settings: ObservableObject {
 
     /// Bật khu vực quản lý OTP (tab OTP trong popup + menu Quản lý OTP).
     @Published var enableOTP: Bool {
-        didSet { UserDefaults.standard.set(enableOTP, forKey: "feature_enableOTP") }
+        didSet {
+            UserDefaults.standard.set(enableOTP, forKey: "feature_enableOTP")
+            NotificationCenter.default.post(name: .otpSettingChanged, object: nil)
+        }
     }
 
     /// Thời gian giữ mở khóa OTP (phút) trước khi hỏi lại PIN/Touch ID.

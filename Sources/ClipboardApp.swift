@@ -92,6 +92,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Theme đổi → cập nhật backgroundColor (titlebar) cho popup nếu đang mở
         NotificationCenter.default.addObserver(self, selector: #selector(themeDidChange),
             name: .themeDidChange, object: nil)
+
+        // OTP bật/tắt → rebuild status menu để hiện/ẩn mục "Quản lý OTP"
+        NotificationCenter.default.addObserver(self, selector: #selector(otpSettingChanged),
+            name: .otpSettingChanged, object: nil)
         
         // Tự động kiểm tra cập nhật (silent)
         if Settings.shared.autoCheckForUpdates {
@@ -178,6 +182,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func shortcutChanged() {
         setupHotKey() // Cập nhật lại phím tắt khi có thay đổi
+    }
+
+    @objc private func otpSettingChanged() {
+        setupMenu() // Rebuild menu khi bật/tắt OTP
     }
 
     /// Reset TCC entry cho Accessibility — dùng khi detect stale entry sau update
@@ -395,7 +403,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         print("DEBUG: Cửa sổ cài đặt đã được mở")
     }
 
-    @objc func openOTPManager() {
+    @objc private func openOTPManager() {
         OTPManagerWindow.shared.show()
     }
     
