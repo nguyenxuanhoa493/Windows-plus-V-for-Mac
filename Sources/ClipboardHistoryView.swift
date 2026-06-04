@@ -52,6 +52,8 @@ struct ClipboardHistoryView: View {
     let onTogglePin: ((ClipboardItem) -> Void)?
     let onDeleteItem: ((ClipboardItem) -> Void)?
     let onToggleBookmark: ((ClipboardItem) -> Void)?
+    let onPasteOTP: ((String) -> Void)?
+    let onManageOTP: (() -> Void)?
     @ObservedObject private var settings = Settings.shared
     @State private var selectedFilter: ContentFilter = .all
     @State private var isSearching = false
@@ -61,6 +63,7 @@ struct ClipboardHistoryView: View {
     @State private var isSearchFieldFocused = false
     @State private var keyboardMonitor: Any?
     @State private var selectedIndex: Int = 0
+    @State private var showOTPTab = false
 
     // Helper để check file có phải ảnh không
     private func isImageFile(_ item: ClipboardItem) -> Bool {
@@ -162,6 +165,40 @@ struct ClipboardHistoryView: View {
     }
     
     var body: some View {
+        VStack(spacing: 0) {
+            if settings.enableOTP {
+                HStack(spacing: 0) {
+                    tabButton(titleKey: "clipboard_tab", active: !showOTPTab) { showOTPTab = false }
+                    tabButton(titleKey: "otp_tab", active: showOTPTab) { showOTPTab = true }
+                }
+                .padding(.horizontal, 8).padding(.top, 6)
+            }
+
+            if showOTPTab && settings.enableOTP {
+                OTPView(
+                    onPasteCode: { code in onPasteOTP?(code) },
+                    onManage: { onManageOTP?() }
+                )
+            } else {
+                clipboardContent
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func tabButton(titleKey: String, active: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(Localization.shared.localizedString(titleKey))
+                .font(.system(size: 12, weight: active ? .semibold : .regular))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .background(active ? settings.themedAccent.opacity(0.2) : Color.clear)
+                .foregroundColor(active ? settings.themedAccent : .secondary)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+        }.buttonStyle(.plain)
+    }
+
+    private var clipboardContent: some View {
         VStack(spacing: 0) {
             // Filter bar - có thể kéo để move window
             HStack(spacing: 8) {

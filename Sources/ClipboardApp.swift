@@ -151,6 +151,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         settingsItem.target = self
         menu.addItem(settingsItem)
 
+        if Settings.shared.enableOTP {
+            let otpItem = NSMenuItem(title: Localization.shared.localizedString("otp_manage"),
+                                     action: #selector(openOTPManager), keyEquivalent: "o")
+            otpItem.target = self
+            menu.addItem(otpItem)
+        }
+
         menu.addItem(NSMenuItem.separator())
 
         let updateItem = NSMenuItem(title: Localization.shared.localizedString("check_for_updates"), action: #selector(checkForUpdates), keyEquivalent: "u")
@@ -296,6 +303,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }, onToggleBookmark: { [weak self, weak panel] item in
             self?.clipboardManager.toggleBookmark(item)
             if let panel = panel { self?.applyPanelContent(to: panel) }
+        }, onPasteOTP: { [weak self, weak panel] code in
+            panel?.close()
+            self?.handleOTPPaste(code)
+        }, onManageOTP: { [weak panel] in
+            panel?.close()
+            OTPManagerWindow.shared.show()
         })
         let hostingView = NSHostingView(rootView: view)
         hostingView.frame = NSRect(origin: .zero, size: popoverSize)
@@ -380,6 +393,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         print("DEBUG: Đang mở cửa sổ cài đặt...")
         SettingsWindow.shared.show()
         print("DEBUG: Cửa sổ cài đặt đã được mở")
+    }
+
+    @objc func openOTPManager() {
+        OTPManagerWindow.shared.show()
     }
     
     @objc func checkForUpdates() {
@@ -481,6 +498,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         eventMonitor = monitor
     }
     
+    /// Paste 1 mã OTP: copy vào pasteboard rồi auto-paste. ignoreNextChange()
+    /// để mã KHÔNG lọt vào lịch sử clipboard (vốn lưu plaintext).
+    private func handleOTPPaste(_ code: String) {
+        removeEventMonitor()
+        if let window = virtualWindow { window.close() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            self.clipboardManager.ignoreNextChange()
+            let pb = NSPasteboard.general
+            pb.clearContents()
+            pb.setString(code, forType: .string)
+            // ⌘V synthesis — match ClipboardItem.paste() chính xác
+            guard let source = CGEventSource(stateID: .hidSystemState) else { return }
+            let cmdDown = CGEvent(keyboardEventSource: source, virtualKey: 0x37, keyDown: true)
+            let vDown = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true)
+            let vUp = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false)
+            let cmdUp = CGEvent(keyboardEventSource: source, virtualKey: 0x37, keyDown: false)
+            vDown?.flags = .maskCommand
+            vUp?.flags = .maskCommand
+            cmdDown?.post(tap: .cghidEventTap)
+            vDown?.post(tap: .cghidEventTap)
+            vUp?.post(tap: .cghidEventTap)
+            cmdUp?.post(tap: .cghidEventTap)
+        }
+    }
+
     private func handleItemSelected(_ item: ClipboardItem) {
         // Đóng cửa sổ trước
         removeEventMonitor()
