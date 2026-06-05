@@ -2,14 +2,20 @@ import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
 
+/// Nguồn thêm OTP được yêu cầu sẵn khi mở cửa sổ quản lý.
+enum OTPAddSource { case manual, qrImage, screenRegion }
+
 struct OTPManagerView: View {
     @ObservedObject private var manager = OTPManager.shared
     private let auth = OTPAuth.shared
+
+    var initialAddSource: OTPAddSource? = nil
 
     @State private var unlocked = OTPManager.shared.isUnlocked
     @State private var showingAdd = false
     @State private var editingItem: OTPItem?
     @State private var statusMessage = ""
+    @State private var pendingAddSource: OTPAddSource?
 
     var body: some View {
         Group {
@@ -54,8 +60,14 @@ struct OTPManagerView: View {
                 Text(statusMessage).font(.system(size: 11)).foregroundColor(.secondary).padding(6)
             }
         }
+        .onAppear {
+            if let src = initialAddSource {
+                pendingAddSource = src
+                showingAdd = true
+            }
+        }
         .sheet(isPresented: $showingAdd) {
-            OTPEditSheet(item: nil) { newItem in manager.add(newItem) }
+            OTPEditSheet(item: nil, onSave: { newItem in manager.add(newItem) }, initialSource: pendingAddSource)
         }
         .sheet(item: $editingItem) { item in
             OTPEditSheet(item: item) { updated in manager.update(updated) }
@@ -132,6 +144,7 @@ struct OTPManagerView: View {
 struct OTPEditSheet: View {
     let item: OTPItem?
     let onSave: (OTPItem) -> Bool
+    var initialSource: OTPAddSource? = nil
     @Environment(\.dismiss) private var dismiss
 
     @State private var name = ""
@@ -142,6 +155,7 @@ struct OTPEditSheet: View {
     @State private var period = 30
     @State private var showAdvanced = false
     @State private var error = ""
+    @State private var didTriggerSource = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -178,13 +192,26 @@ struct OTPEditSheet: View {
             }
         }
         .padding(16).frame(width: 380)
-        .onAppear(perform: loadItem)
+        .onAppear {
+            loadItem()
+            triggerInitialSourceIfNeeded()
+        }
     }
 
     private func loadItem() {
         guard let item = item else { return }
         name = item.name; issuer = item.issuer ?? ""; secret = item.secret
         algorithm = item.algorithm; digits = item.digits; period = item.period
+    }
+
+    private func triggerInitialSourceIfNeeded() {
+        guard item == nil, !didTriggerSource, let src = initialSource else { return }
+        didTriggerSource = true
+        switch src {
+        case .manual: break               // chỉ hiện form nhập tay
+        case .qrImage: importQRImage()
+        case .screenRegion: captureScreen()
+        }
     }
 
     private func applyParsed(_ parsed: OTPItem) {
@@ -212,17 +239,27 @@ struct OTPEditSheet: View {
     }
 
     private func save() {
-        let trimmedSecret = secret.uppercased().replacingOccurrences(of: " ", with: "")
+        // Cho phép dán thẳng otpauth:// vào ô secret → parse ra các trường.
+        var n = name
+        var iss: String? = issuer.isEmpty ? nil : issuer
+        var sec = secret, alg = algorithm, dig = digits, per = period
+        let trimmed = secret.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.lowercased().hasPrefix("otpauth://"), let parsed = OTPItem.parse(otpauthURI: trimmed) {
+            n = parsed.name; iss = parsed.issuer; sec = parsed.secret
+            alg = parsed.algorithm; dig = parsed.digits; per = parsed.period
+            applyParsed(parsed)  // phản hồi lên UI
+        }
+        let trimmedSecret = sec.uppercased().replacingOccurrences(of: " ", with: "")
         guard OTPItem.base32Decode(trimmedSecret) != nil, !trimmedSecret.isEmpty else {
             error = Localization.shared.localizedString("otp_invalid_secret"); return
         }
-        guard !name.trimmingCharacters(in: .whitespaces).isEmpty else {
+        guard !n.trimmingCharacters(in: .whitespaces).isEmpty else {
             error = Localization.shared.localizedString("otp_name"); return
         }
         let result = OTPItem(
             id: item?.id ?? UUID(),
-            name: name, issuer: issuer.isEmpty ? nil : issuer,
-            secret: trimmedSecret, algorithm: algorithm, digits: digits, period: period,
+            name: n, issuer: iss,
+            secret: trimmedSecret, algorithm: alg, digits: dig, period: per,
             createdAt: item?.createdAt ?? Date()
         )
         if onSave(result) {
