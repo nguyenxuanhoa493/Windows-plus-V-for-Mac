@@ -106,16 +106,28 @@ struct OTPTabView: View {
     }
 
     private func addFromScreenRegion() {
+        // Đăng ký app vào danh sách Screen Recording + xin quyền (idempotent; chỉ hỏi lần đầu).
+        CGRequestScreenCaptureAccess()
         // Ẩn popup trong lúc chọn vùng: (1) tránh popup (mức nổi) lọt vào ảnh chụp che mất QR,
         // (2) click chọn vùng là sự kiện app khác → tránh global monitor tự đóng popup.
         let popup = NSApp.windows.first { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("Clipboard") }
         popup?.orderOut(nil)
-        QRDecoder.captureScreenRegion { msg in
-            popup?.makeKeyAndOrderFront(nil)   // hiện lại popup, không đóng
-            guard let msg = msg, let parsed = OTPItem.parse(otpauthURI: msg) else {
-                statusMessage = Localization.shared.localizedString("otp_qr_not_found"); return
+        // Trễ nhỏ để popup biến mất hẳn trước khi crosshair xuất hiện.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            QRDecoder.captureScreenRegion { msg in
+                popup?.makeKeyAndOrderFront(nil)   // hiện lại popup, không đóng
+                if let msg = msg, let parsed = OTPItem.parse(otpauthURI: msg) {
+                    addParsed(parsed)
+                } else if !CGPreflightScreenCaptureAccess() {
+                    // Chụp hỏng do thiếu quyền Quay màn hình ("could not create image from rect").
+                    statusMessage = Localization.shared.localizedString("otp_need_screen_permission")
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+                        NSWorkspace.shared.open(url)
+                    }
+                } else {
+                    statusMessage = Localization.shared.localizedString("otp_qr_not_found")
+                }
             }
-            addParsed(parsed)
         }
     }
 

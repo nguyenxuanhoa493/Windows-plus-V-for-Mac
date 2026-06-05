@@ -200,6 +200,7 @@ class Localization: ObservableObject {
         "otp_edit": [.english: "Edit", .vietnamese: "Sửa"],
         "otp_invalid_secret": [.english: "Invalid base32 secret", .vietnamese: "Khóa base32 không hợp lệ"],
         "otp_qr_not_found": [.english: "No valid QR code found", .vietnamese: "Không tìm thấy mã QR hợp lệ"],
+        "otp_need_screen_permission": [.english: "Grant Screen Recording permission in System Settings, then try again", .vietnamese: "Hãy cấp quyền Quay màn hình trong System Settings rồi thử lại"],
         "otp_export": [.english: "Export (encrypted)", .vietnamese: "Xuất (mã hóa)"],
         "otp_import": [.english: "Import", .vietnamese: "Nhập"],
         "otp_export_warning": [.english: "The file is encrypted with your 6-digit PIN. Keep it safe; losing the PIN means losing the data.", .vietnamese: "File được mã hóa bằng PIN 6 số của bạn. Giữ file an toàn; mất PIN là mất dữ liệu."],
