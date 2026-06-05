@@ -90,34 +90,51 @@ struct OTPItem: Codable, Identifiable, Equatable {
 
     // MARK: - otpauth:// parser
     /// Parse `otpauth://totp/Label?secret=...&issuer=...&algorithm=...&digits=...&period=...`
+    /// Tự parse thủ công (KHÔNG dùng URLComponents) để chịu được URI lệch chuẩn:
+    /// label có dấu cách, ký tự "(" ")" lạc, thiếu ")" — vẫn lấy đúng secret và dọn tên sạch.
     static func parse(otpauthURI uri: String) -> OTPItem? {
-        guard let comps = URLComponents(string: uri),
-              comps.scheme?.lowercased() == "otpauth",
-              comps.host?.lowercased() == "totp" else { return nil }
+        let trimmed = uri.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.lowercased().hasPrefix("otpauth://totp") else { return nil }
 
-        let items = comps.queryItems ?? []
-        func q(_ k: String) -> String? { items.first(where: { $0.name.lowercased() == k })?.value }
-
-        guard let secret = q("secret"), !secret.isEmpty else { return nil }
-
-        // Label = phần path sau "/", có thể là "Issuer:account".
-        var label = comps.path
-        if label.hasPrefix("/") { label.removeFirst() }
-        label = label.removingPercentEncoding ?? label
-
-        var issuer = q("issuer")
-        var name = label
-        if label.contains(":") {
-            let parts = label.split(separator: ":", maxSplits: 1).map(String.init)
-            let candidate = parts[0].trimmingCharacters(in: .whitespaces)
-            if issuer == nil, !candidate.isEmpty { issuer = candidate }
-            name = parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespaces) : label
+        // Bỏ phần "otpauth://totp", còn lại "/Label?query" | "?query" | "/Label".
+        let rest = String(trimmed.dropFirst("otpauth://totp".count))
+        var labelPart = rest
+        var queryPart = ""
+        if let qIdx = rest.firstIndex(of: "?") {
+            labelPart = String(rest[..<qIdx])
+            queryPart = String(rest[rest.index(after: qIdx)...])
         }
+        if labelPart.hasPrefix("/") { labelPart.removeFirst() }
+        labelPart = labelPart.removingPercentEncoding ?? labelPart
+
+        // Parse query params thủ công (secret base32 không chứa & hay =).
+        var params: [String: String] = [:]
+        for pair in queryPart.split(separator: "&") {
+            let kv = pair.split(separator: "=", maxSplits: 1).map(String.init)
+            guard kv.count == 2 else { continue }
+            params[kv[0].lowercased()] = kv[1].removingPercentEncoding ?? kv[1]
+        }
+
+        guard let secret = params["secret"], !secret.isEmpty else { return nil }
+
+        // Dọn tên: bỏ khoảng trắng và ký tự ( ) lạc (vd "LotusLMS (").
+        let junk = CharacterSet(charactersIn: " ()\t\n")
+        var issuer = params["issuer"]
+        var name = labelPart
+        if labelPart.contains(":") {
+            let parts = labelPart.split(separator: ":", maxSplits: 1).map(String.init)
+            let candidate = parts[0].trimmingCharacters(in: junk)
+            if issuer == nil, !candidate.isEmpty { issuer = candidate }
+            name = parts.count > 1 ? parts[1] : labelPart
+        }
+        name = name.trimmingCharacters(in: junk)
+        issuer = issuer?.trimmingCharacters(in: junk)
+        if let iss = issuer, iss.isEmpty { issuer = nil }
         if name.isEmpty { name = issuer ?? "OTP" }
 
-        let algorithm = OTPAlgorithm(rawValue: (q("algorithm") ?? "sha1").lowercased()) ?? .sha1
-        let digits = Int(q("digits") ?? "6") ?? 6
-        let period = Int(q("period") ?? "30") ?? 30
+        let algorithm = OTPAlgorithm(rawValue: (params["algorithm"] ?? "sha1").lowercased()) ?? .sha1
+        let digits = Int(params["digits"] ?? "6") ?? 6
+        let period = Int(params["period"] ?? "30") ?? 30
 
         return OTPItem(name: name, issuer: issuer, secret: secret.uppercased(),
                        algorithm: algorithm, digits: digits, period: period)
