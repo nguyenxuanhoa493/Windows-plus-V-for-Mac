@@ -68,28 +68,34 @@ struct OTPTabView: View {
     private func row(_ item: OTPItem) -> some View {
         let code = item.code(at: otpNow) ?? "------"
         let remaining = item.secondsRemaining(at: otpNow)
-        return HStack {
-            Button(action: { onPasteCode(code) }) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(item.name).font(.system(size: 12, weight: .medium)).foregroundColor(settings.themedForeground)
-                        if let iss = item.issuer, !iss.isEmpty { Text(iss).font(.system(size: 10)).foregroundColor(.secondary) }
-                    }
-                    Spacer()
-                    Text(code).font(.system(size: 16, weight: .semibold, design: .monospaced)).foregroundColor(settings.themedAccent)
-                    ZStack {
-                        Circle().stroke(Color.secondary.opacity(0.3), lineWidth: 2)
-                        Circle().trim(from: 0, to: CGFloat(remaining)/CGFloat(max(item.period, 1)))
-                            .stroke(settings.themedAccent, lineWidth: 2).rotationEffect(.degrees(-90))
-                        Text("\(remaining)").font(.system(size: 9))
-                    }.frame(width: 22, height: 22)
+        return Button(action: { onPasteCode(code) }) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.name).font(.system(size: 15, weight: .semibold)).foregroundColor(settings.themedForeground)
+                    if let iss = item.issuer, !iss.isEmpty { Text(iss).font(.system(size: 12)).foregroundColor(.secondary) }
                 }
-            }.buttonStyle(.plain)
-            Button(action: { editingItem = item }) { Image(systemName: "pencil") }.buttonStyle(.plain).foregroundColor(.secondary)
-            Button(action: { otpManager.delete(item) }) { Image(systemName: "trash") }.buttonStyle(.plain).foregroundColor(.red)
+                Spacer()
+                Text(code).font(.system(size: 22, weight: .semibold, design: .monospaced)).foregroundColor(settings.themedAccent)
+                ZStack {
+                    Circle().stroke(Color.secondary.opacity(0.3), lineWidth: 2.5)
+                    Circle().trim(from: 0, to: CGFloat(remaining)/CGFloat(max(item.period, 1)))
+                        .stroke(settings.themedAccent, lineWidth: 2.5).rotationEffect(.degrees(-90))
+                    Text("\(remaining)").font(.system(size: 11))
+                }.frame(width: 30, height: 30)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 10).fill(settings.themedSurface))
         }
-        .padding(10)
-        .background(RoundedRectangle(cornerRadius: 8).fill(settings.themedSurface))
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button(action: { editingItem = item }) {
+                Label(Localization.shared.localizedString("otp_edit"), systemImage: "pencil")
+            }
+            Button(role: .destructive, action: { otpManager.delete(item) }) {
+                Label(Localization.shared.localizedString("otp_delete"), systemImage: "trash")
+            }
+        }
     }
 
     // MARK: - Thêm từ QR ảnh / vùng màn hình (thao tác trực tiếp, không mở form)
