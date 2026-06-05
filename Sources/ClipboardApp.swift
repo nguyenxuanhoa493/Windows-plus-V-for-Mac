@@ -19,6 +19,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var virtualWindow: NSPanel?
     var eventMonitor: Any?
     var hotKey: HotKey?
+    /// Tạm "ghim" popup: bỏ qua việc tự đóng khi click ra ngoài (vd đang chọn file QR).
+    static var suppressDismiss = false
     private var clipboardManager = ClipboardManager.shared
     
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -482,6 +484,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         panel.makeKeyAndOrderFront(nil)
 
         let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self, weak panel] event in
+            if AppDelegate.suppressDismiss { return }
             if let panel = panel, panel.isVisible {
                 let mouseLocation = NSEvent.mouseLocation
                 if !panel.frame.contains(mouseLocation) {

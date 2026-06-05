@@ -4,6 +4,8 @@ import UniformTypeIdentifiers
 /// Export/Import file OTP mã hóa (gọi từ menu ⚙️ của popup khi đang ở tab OTP).
 enum OTPBackup {
     static func exportInteractive() {
+        AppDelegate.suppressDismiss = true   // ghim popup khi đang thao tác hộp thoại
+        defer { AppDelegate.suppressDismiss = false }
         let auth = OTPAuth.shared
         guard auth.hasPIN else { info(Localization.shared.localizedString("otp_setup_pin_title")); return }
         guard let pin = promptPIN(title: Localization.shared.localizedString("otp_export"),
@@ -23,6 +25,8 @@ enum OTPBackup {
     }
 
     static func importInteractive() {
+        AppDelegate.suppressDismiss = true   // ghim popup khi đang thao tác hộp thoại
+        defer { AppDelegate.suppressDismiss = false }
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [UTType.data]
         panel.allowsMultipleSelection = false

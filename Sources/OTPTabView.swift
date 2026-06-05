@@ -94,6 +94,8 @@ struct OTPTabView: View {
 
     // MARK: - Thêm từ QR ảnh / vùng màn hình (thao tác trực tiếp, không mở form)
     private func addFromQRImage() {
+        AppDelegate.suppressDismiss = true   // ghim popup khi đang chọn file QR
+        defer { AppDelegate.suppressDismiss = false }
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [UTType.image]
         guard panel.runModal() == .OK, let url = panel.url else { return }
