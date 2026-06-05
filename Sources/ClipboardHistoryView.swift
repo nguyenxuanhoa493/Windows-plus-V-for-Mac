@@ -248,7 +248,8 @@ struct ClipboardHistoryView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(settings.themedBackground)
+            // Liquid Glass: để trong suốt cho nền vibrancy hiện qua.
+            .background(Color.clear)
             // Filter bar phải paint trên cùng để tooltip (offset y+30) không bị list items đè
             .zIndex(2)
 
@@ -346,7 +347,7 @@ struct ClipboardHistoryView: View {
             shortcutHintBar
         }
         .frame(width: 300, height: 450)
-        .background(settings.themedBackground)
+        .background(VisualEffectBackground().ignoresSafeArea())
         .modifier(ConditionalThemeModifier(theme: settings.appTheme, active: settings.isCustomThemeActive))
         .onAppear {
             installKeyboardMonitor()
@@ -464,7 +465,7 @@ struct ClipboardHistoryView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
         .background(
-            settings.themedBackground
+            Color.clear
                 .overlay(
                     Rectangle()
                         .fill(Color(NSColor.separatorColor))

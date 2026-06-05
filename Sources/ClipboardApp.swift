@@ -202,7 +202,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func themeDidChange() {
-        virtualWindow?.backgroundColor = NSColor(Settings.shared.themedBackground)
+        virtualWindow?.backgroundColor = .clear
     }
 
     @objc private func settingsWindowDidShow(_ note: Notification) {
@@ -227,7 +227,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Anchored mode: lower level để Settings có thể front-most khi user click
         panel.level = .floating
-        panel.backgroundColor = NSColor(Settings.shared.themedBackground)
+        panel.backgroundColor = .clear
 
         let origin = positionRight(of: anchor, panelSize: popoverSize)
         panel.setFrame(NSRect(origin: origin, size: popoverSize), display: false)
@@ -428,6 +428,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         panel.isMovableByWindowBackground = false
         // Titlebar trong suốt → kế thừa backgroundColor → custom theme phủ luôn lên titlebar
         panel.titlebarAppearsTransparent = true
+        // Liquid Glass: cửa sổ trong suốt để NSVisualEffectView (behind-window) hiện hiệu ứng kính.
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
         panel.standardWindowButton(.closeButton)?.isHidden = false
         panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
         panel.standardWindowButton(.zoomButton)?.isHidden = true
@@ -473,7 +476,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Cursor mode: level cao để stay-on-top, click outside dismiss
         panel.level = .popUpMenu
-        panel.backgroundColor = NSColor(Settings.shared.themedBackground)
+        panel.backgroundColor = .clear
 
         panel.setFrame(
             NSRect(x: popoverOriginX, y: popoverOriginY, width: popoverSize.width, height: popoverSize.height),

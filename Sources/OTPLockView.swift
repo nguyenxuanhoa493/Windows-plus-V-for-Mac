@@ -20,7 +20,7 @@ struct OTPLockView: View {
         VStack(spacing: 0) {
             if !auth.hasPIN { setupPinScreen } else { lockScreen }
         }
-        .background(settings.themedBackground)
+        .background(Color.clear)
         .onReceive(ticker) { _ in lockoutRemaining = auth.lockoutRemaining }
         .onAppear { attemptBiometrics() }
     }
