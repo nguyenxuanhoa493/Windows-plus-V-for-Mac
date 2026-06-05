@@ -481,26 +481,46 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         applyPanelContent(to: panel)
+        // Animation hiện: mờ dần (kiểu macOS).
+        panel.alphaValue = 0
         panel.makeKeyAndOrderFront(nil)
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.16
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().alphaValue = 1
+        }
 
         let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self, weak panel] event in
             if AppDelegate.suppressDismiss { return }
             if let panel = panel, panel.isVisible {
                 let mouseLocation = NSEvent.mouseLocation
                 if !panel.frame.contains(mouseLocation) {
-                    panel.close()
+                    self?.fadeOutAndClose(panel)
                     self?.removeEventMonitor()
                 }
             }
         }
         eventMonitor = monitor
     }
+
+    /// Animation biến mất: mờ dần rồi đóng (reset alpha để tái dùng panel).
+    func fadeOutAndClose(_ panel: NSWindow) {
+        guard panel.isVisible else { panel.close(); return }
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.14
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            panel.animator().alphaValue = 0
+        }, completionHandler: {
+            panel.close()
+            panel.alphaValue = 1
+        })
+    }
     
     /// Paste 1 mã OTP: copy vào pasteboard rồi auto-paste. ignoreNextChange()
     /// để mã KHÔNG lọt vào lịch sử clipboard (vốn lưu plaintext).
     private func handleOTPPaste(_ code: String) {
         removeEventMonitor()
-        if let window = virtualWindow { window.close() }
+        if let window = virtualWindow { fadeOutAndClose(window) }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             self.clipboardManager.ignoreNextChange()
             let pb = NSPasteboard.general
@@ -522,10 +542,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func handleItemSelected(_ item: ClipboardItem) {
-        // Đóng cửa sổ trước
+        // Đóng cửa sổ trước (mờ dần)
         removeEventMonitor()
         if let window = virtualWindow {
-            window.close()
+            fadeOutAndClose(window)
         }
         
         // Đợi window đóng và app ban đầu được focus trở lại

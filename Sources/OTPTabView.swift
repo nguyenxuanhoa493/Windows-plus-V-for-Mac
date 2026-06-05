@@ -42,7 +42,12 @@ struct OTPTabView: View {
                 }.frame(maxWidth: .infinity).padding()
             } else {
                 LazyVStack(spacing: 10) {
-                    ForEach(list) { item in row(item) }
+                    ForEach(list) { item in
+                        OTPRowView(item: item, now: otpNow,
+                                   onPaste: { onPasteCode($0) },
+                                   onEdit: { editingItem = item },
+                                   onDelete: { otpManager.delete(item) })
+                    }
                 }.padding(.horizontal, 12).padding(.vertical, 6)
             }
             if !statusMessage.isEmpty {
@@ -76,46 +81,6 @@ struct OTPTabView: View {
             .fixedSize()
             Spacer()
         }.padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 6)
-    }
-
-    private func row(_ item: OTPItem) -> some View {
-        let code = item.code(at: otpNow) ?? "------"
-        let remaining = item.secondsRemaining(at: otpNow)
-        return Button(action: { onPasteCode(code) }) {
-            HStack(spacing: 14) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(item.name).font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(settings.themedForeground)
-                    if let iss = item.issuer, !iss.isEmpty {
-                        Text(iss).font(.system(size: 12)).foregroundStyle(.secondary)
-                    }
-                }
-                Spacer(minLength: 8)
-                Text(code).font(.system(size: 24, weight: .bold, design: .rounded))
-                    .monospacedDigit().foregroundColor(settings.themedAccent)
-                ZStack {
-                    Circle().stroke(Color.secondary.opacity(0.25), lineWidth: 3)
-                    Circle().trim(from: 0, to: CGFloat(remaining)/CGFloat(max(item.period, 1)))
-                        .stroke(settings.themedAccent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                    Text("\(remaining)").font(.system(size: 12, weight: .medium)).monospacedDigit()
-                }.frame(width: 34, height: 34)
-            }
-            .padding(.horizontal, 16).padding(.vertical, 14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .liquidGlass(cornerRadius: 18)
-            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(settings.themedAccent.opacity(0.15), lineWidth: 1))
-        }
-        .buttonStyle(.plain)
-        .contextMenu {
-            Button(action: { editingItem = item }) {
-                Label(Localization.shared.localizedString("otp_edit"), systemImage: "pencil")
-            }
-            Button(role: .destructive, action: { otpManager.delete(item) }) {
-                Label(Localization.shared.localizedString("otp_delete"), systemImage: "trash")
-            }
-        }
     }
 
     // MARK: - Thêm từ QR ảnh / vùng màn hình (thao tác trực tiếp, không mở form)
@@ -279,5 +244,85 @@ struct OTPEditSheet: View {
         } else {
             error = Localization.shared.localizedString("otp_secret_duplicate")
         }
+    }
+}
+
+/// Dòng OTP (tab OTP) — card Liquid Glass + hover tráng gương + nhún khi chọn.
+struct OTPRowView: View {
+    let item: OTPItem
+    let now: Date
+    let onPaste: (String) -> Void
+    let onEdit: () -> Void
+    let onDelete: () -> Void
+
+    @ObservedObject private var settings = Settings.shared
+    @State private var hovered = false
+    @State private var shine: CGFloat = -1
+
+    var body: some View {
+        let code = item.code(at: now) ?? "------"
+        let remaining = item.secondsRemaining(at: now)
+        return Button(action: { onPaste(code) }) {
+            HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.name).font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(settings.themedForeground)
+                    if let iss = item.issuer, !iss.isEmpty {
+                        Text(iss).font(.system(size: 12)).foregroundStyle(.secondary)
+                    }
+                }
+                Spacer(minLength: 8)
+                Text(code).font(.system(size: 24, weight: .bold, design: .rounded))
+                    .monospacedDigit().foregroundColor(settings.themedAccent)
+                ZStack {
+                    Circle().stroke(Color.secondary.opacity(0.25), lineWidth: 3)
+                    Circle().trim(from: 0, to: CGFloat(remaining)/CGFloat(max(item.period, 1)))
+                        .stroke(settings.themedAccent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                    Text("\(remaining)").font(.system(size: 12, weight: .medium)).monospacedDigit()
+                }.frame(width: 34, height: 34)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .liquidGlass(cornerRadius: 18)
+            .overlay(shineOverlay)
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(settings.themedAccent.opacity(hovered ? 0.45 : 0.15), lineWidth: 1))
+            .scaleEffect(hovered ? 1.015 : 1.0)
+            .shadow(color: settings.themedAccent.opacity(hovered ? 0.22 : 0), radius: hovered ? 8 : 0, y: 2)
+        }
+        .buttonStyle(PressDownButtonStyle())
+        .onHover { h in
+            withAnimation(.easeOut(duration: 0.18)) { hovered = h }
+            if h {
+                shine = -1
+                withAnimation(.easeInOut(duration: 0.75)) { shine = 1 }
+            }
+        }
+        .contextMenu {
+            Button(action: onEdit) {
+                Label(Localization.shared.localizedString("otp_edit"), systemImage: "pencil")
+            }
+            Button(role: .destructive, action: onDelete) {
+                Label(Localization.shared.localizedString("otp_delete"), systemImage: "trash")
+            }
+        }
+    }
+
+    /// Vệt sáng chéo quét ngang khi hover (hiệu ứng tráng gương).
+    private var shineOverlay: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            RoundedRectangle(cornerRadius: 4)
+                .fill(LinearGradient(colors: [.clear, .white.opacity(0.4), .clear],
+                                     startPoint: .top, endPoint: .bottom))
+                .frame(width: w * 0.30)
+                .rotationEffect(.degrees(22))
+                .offset(x: shine * w * 1.2)
+                .blendMode(.plusLighter)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .opacity(hovered ? 1 : 0)
+        .allowsHitTesting(false)
     }
 }
