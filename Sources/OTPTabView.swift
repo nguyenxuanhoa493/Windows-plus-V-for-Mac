@@ -32,16 +32,22 @@ struct OTPTabView: View {
             header
             let list = otpManager.search(searchText)
             if list.isEmpty {
-                Text(Localization.shared.localizedString("otp_empty"))
-                    .font(.system(size: 12)).foregroundColor(.secondary)
-                    .multilineTextAlignment(.center).frame(maxWidth: .infinity).padding()
+                VStack(spacing: 10) {
+                    Spacer()
+                    Image(systemName: "lock.shield").font(.system(size: 40)).foregroundStyle(.secondary)
+                    Text(Localization.shared.localizedString("otp_empty"))
+                        .font(.system(size: 13)).foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Spacer()
+                }.frame(maxWidth: .infinity).padding()
             } else {
-                LazyVStack(spacing: 8) {
+                LazyVStack(spacing: 10) {
                     ForEach(list) { item in row(item) }
-                }.padding(.horizontal, 8).padding(.vertical, 4)
+                }.padding(.horizontal, 12).padding(.vertical, 6)
             }
             if !statusMessage.isEmpty {
-                Text(statusMessage).font(.system(size: 11)).foregroundColor(.secondary).padding(6)
+                Text(statusMessage).font(.system(size: 12)).foregroundStyle(.secondary)
+                    .padding(.horizontal, 12).padding(.vertical, 8)
             }
         }
         .sheet(isPresented: $showingAdd, onDismiss: { pendingAddSource = nil }) {
@@ -60,32 +66,46 @@ struct OTPTabView: View {
                 Button(Localization.shared.localizedString("otp_add_clipboard")) { addFromClipboardImage() }
             } label: {
                 Label(Localization.shared.localizedString("otp_add"), systemImage: "plus")
-            }.fixedSize()
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(settings.themedAccent)
+                    .padding(.horizontal, 14).padding(.vertical, 8)
+                    .liquidGlass(cornerRadius: 12)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
             Spacer()
-        }.padding(.horizontal, 12).padding(.vertical, 6)
+        }.padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 6)
     }
 
     private func row(_ item: OTPItem) -> some View {
         let code = item.code(at: otpNow) ?? "------"
         let remaining = item.secondsRemaining(at: otpNow)
         return Button(action: { onPasteCode(code) }) {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(item.name).font(.system(size: 15, weight: .semibold)).foregroundColor(settings.themedForeground)
-                    if let iss = item.issuer, !iss.isEmpty { Text(iss).font(.system(size: 12)).foregroundColor(.secondary) }
+            HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.name).font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(settings.themedForeground)
+                    if let iss = item.issuer, !iss.isEmpty {
+                        Text(iss).font(.system(size: 12)).foregroundStyle(.secondary)
+                    }
                 }
-                Spacer()
-                Text(code).font(.system(size: 22, weight: .semibold, design: .monospaced)).foregroundColor(settings.themedAccent)
+                Spacer(minLength: 8)
+                Text(code).font(.system(size: 24, weight: .bold, design: .rounded))
+                    .monospacedDigit().foregroundColor(settings.themedAccent)
                 ZStack {
-                    Circle().stroke(Color.secondary.opacity(0.3), lineWidth: 2.5)
+                    Circle().stroke(Color.secondary.opacity(0.25), lineWidth: 3)
                     Circle().trim(from: 0, to: CGFloat(remaining)/CGFloat(max(item.period, 1)))
-                        .stroke(settings.themedAccent, lineWidth: 2.5).rotationEffect(.degrees(-90))
-                    Text("\(remaining)").font(.system(size: 11))
-                }.frame(width: 30, height: 30)
+                        .stroke(settings.themedAccent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                    Text("\(remaining)").font(.system(size: 12, weight: .medium)).monospacedDigit()
+                }.frame(width: 34, height: 34)
             }
-            .padding(.horizontal, 14).padding(.vertical, 12)
+            .padding(.horizontal, 16).padding(.vertical, 14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 10).fill(settings.themedSurface))
+            .liquidGlass(cornerRadius: 18)
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(settings.themedAccent.opacity(0.15), lineWidth: 1))
         }
         .buttonStyle(.plain)
         .contextMenu {

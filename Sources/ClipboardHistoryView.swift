@@ -371,31 +371,34 @@ struct ClipboardHistoryView: View {
         return Button(action: {
             if unlocked, let c = item.code(at: otpNow) { onPasteOTP?(c) }
         }) {
-            HStack {
-                Image(systemName: "lock.shield").font(.system(size: 12)).foregroundColor(.purple)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(item.name).font(.system(size: 12, weight: .medium)).foregroundColor(settings.themedForeground)
-                    if let iss = item.issuer, !iss.isEmpty { Text(iss).font(.system(size: 10)).foregroundColor(.secondary) }
+            HStack(spacing: 12) {
+                Image(systemName: "lock.shield.fill").font(.system(size: 16)).foregroundColor(settings.themedAccent)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.name).font(.system(size: 15, weight: .semibold)).foregroundColor(settings.themedForeground)
+                    if let iss = item.issuer, !iss.isEmpty { Text(iss).font(.system(size: 12)).foregroundStyle(.secondary) }
                 }
-                Spacer()
+                Spacer(minLength: 8)
                 if unlocked {
                     Text(item.code(at: otpNow) ?? "------")
-                        .font(.system(size: 16, weight: .semibold, design: .monospaced))
-                        .foregroundColor(settings.themedAccent)
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .monospacedDigit().foregroundColor(settings.themedAccent)
                     let remaining = item.secondsRemaining(at: otpNow)
                     ZStack {
-                        Circle().stroke(Color.secondary.opacity(0.3), lineWidth: 2)
+                        Circle().stroke(Color.secondary.opacity(0.25), lineWidth: 3)
                         Circle().trim(from: 0, to: CGFloat(remaining) / CGFloat(max(item.period, 1)))
-                            .stroke(settings.themedAccent, lineWidth: 2)
+                            .stroke(settings.themedAccent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                             .rotationEffect(.degrees(-90))
-                        Text("\(remaining)").font(.system(size: 9))
-                    }.frame(width: 22, height: 22)
+                        Text("\(remaining)").font(.system(size: 11, weight: .medium)).monospacedDigit()
+                    }.frame(width: 30, height: 30)
                 } else {
-                    Image(systemName: "lock.fill").foregroundColor(.secondary)
+                    Image(systemName: "lock.fill").foregroundStyle(.secondary)
                 }
             }
-            .padding(10)
-            .background(RoundedRectangle(cornerRadius: 8).fill(settings.themedSurface))
+            .padding(.horizontal, 14).padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .liquidGlass(cornerRadius: 16)
+            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(settings.themedAccent.opacity(0.15), lineWidth: 1))
         }.buttonStyle(.plain).disabled(!unlocked)
     }
 

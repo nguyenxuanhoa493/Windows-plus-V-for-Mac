@@ -50,16 +50,18 @@ struct PINEntryView: View {
         let count = pin.count
         let filled = i < count
         let isCurrent = (i == count) && focused
-        return RoundedRectangle(cornerRadius: 8)
-            .stroke(isCurrent ? settings.themedAccent : Color.secondary.opacity(0.4),
-                    lineWidth: isCurrent ? 2 : 1)
-            .frame(width: 36, height: 44)
+        return Color.clear
+            .frame(width: 42, height: 52)
+            .liquidGlass(cornerRadius: 12)
             .overlay(
-                Group {
-                    if filled {
-                        Circle().fill(settings.themedForeground).frame(width: 10, height: 10)
-                    }
-                }
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(isCurrent ? settings.themedAccent : Color.secondary.opacity(0.25),
+                                  lineWidth: isCurrent ? 2.5 : 1)
             )
+            .overlay {
+                if filled {
+                    Circle().fill(settings.themedAccent).frame(width: 12, height: 12)
+                }
+            }
     }
 }

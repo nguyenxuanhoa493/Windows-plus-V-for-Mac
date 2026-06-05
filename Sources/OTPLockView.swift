@@ -26,46 +26,62 @@ struct OTPLockView: View {
     }
 
     private var lockScreen: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            Image(systemName: "lock.fill").font(.system(size: 32)).foregroundColor(.secondary)
-            Text(Localization.shared.localizedString("otp_unlock_title")).font(.system(size: 13, weight: .medium))
+        VStack(spacing: 18) {
+            Spacer(minLength: 12)
+            Image(systemName: "lock.fill")
+                .font(.system(size: 28, weight: .medium))
+                .foregroundColor(settings.themedAccent)
+                .frame(width: 64, height: 64)
+                .liquidGlass(cornerRadius: 32)
+            Text(Localization.shared.localizedString("otp_unlock_title"))
+                .font(.system(size: 15, weight: .semibold))
             PINEntryView(pin: $pin, onComplete: submitPIN)
             if auth.biometricsAvailable {
                 Button(action: attemptBiometrics) {
                     Label(Localization.shared.localizedString("otp_unlock_touchid"), systemImage: "touchid")
-                }
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(settings.themedAccent)
+                        .padding(.horizontal, 16).padding(.vertical, 9)
+                        .liquidGlass(cornerRadius: 12)
+                }.buttonStyle(.plain)
             }
             if !errorMessage.isEmpty {
-                Text(errorMessage).font(.system(size: 11)).foregroundColor(.red)
+                Text(errorMessage).font(.system(size: 12)).foregroundStyle(.red)
             }
             if lockoutRemaining > 0 {
                 Text(String(format: Localization.shared.localizedString("otp_locked_out"), lockoutRemaining))
-                    .font(.system(size: 11)).foregroundColor(.orange)
+                    .font(.system(size: 12)).foregroundStyle(.orange)
             }
-            Spacer()
-        }.padding()
+            Spacer(minLength: 12)
+        }.padding(24).frame(maxWidth: .infinity)
     }
 
     private var setupPinScreen: some View {
         VStack(spacing: 16) {
-            Spacer()
-            Image(systemName: "lock.shield").font(.system(size: 32)).foregroundColor(.secondary)
-            Text(Localization.shared.localizedString("otp_setup_pin_title")).font(.system(size: 13, weight: .medium))
+            Spacer(minLength: 12)
+            Image(systemName: "lock.shield")
+                .font(.system(size: 28, weight: .medium))
+                .foregroundColor(settings.themedAccent)
+                .frame(width: 64, height: 64)
+                .liquidGlass(cornerRadius: 32)
+            Text(Localization.shared.localizedString("otp_setup_pin_title"))
+                .font(.system(size: 15, weight: .semibold))
             Text(Localization.shared.localizedString("otp_enter_pin"))
-                .font(.system(size: 11)).foregroundColor(.secondary)
+                .font(.system(size: 12)).foregroundStyle(.secondary)
             PINEntryView(pin: $pin, onComplete: { requestConfirmFocus = true })
             Text(Localization.shared.localizedString("otp_setup_pin_confirm"))
-                .font(.system(size: 11)).foregroundColor(.secondary)
+                .font(.system(size: 12)).foregroundStyle(.secondary)
             PINEntryView(pin: $confirmPin, autoFocus: false,
                          onComplete: submitNewPIN, focusRequest: $requestConfirmFocus)
             if !errorMessage.isEmpty {
-                Text(errorMessage).font(.system(size: 11)).foregroundColor(.red)
+                Text(errorMessage).font(.system(size: 12)).foregroundStyle(.red)
             }
             Button(Localization.shared.localizedString("otp_save")) { submitNewPIN() }
+                .buttonStyle(.borderedProminent)
+                .tint(settings.themedAccent)
                 .disabled(pin.count != 6 || confirmPin.count != 6)
-            Spacer()
-        }.padding()
+            Spacer(minLength: 12)
+        }.padding(24).frame(maxWidth: .infinity)
     }
 
     private func attemptBiometrics() {
