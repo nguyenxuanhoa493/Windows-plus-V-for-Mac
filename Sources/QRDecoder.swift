@@ -3,7 +3,7 @@ import AppKit
 import CoreImage
 import Vision
 
-/// Giải mã QR từ ảnh hoặc từ vùng màn hình do người dùng chọn.
+/// Giải mã QR từ ảnh (file hoặc trong clipboard).
 enum QRDecoder {
     // MARK: - Public API
 
@@ -68,39 +68,27 @@ enum QRDecoder {
         return nil
     }
 
+    // MARK: - Clipboard
+
+    /// Decode QR từ ảnh đang nằm trong clipboard (ảnh data hoặc file ảnh được copy).
+    static func decodeFromClipboard() -> String? {
+        let pb = NSPasteboard.general
+        if let image = NSImage(pasteboard: pb), let msg = decode(image: image) {
+            return msg
+        }
+        if let urls = pb.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] {
+            for url in urls {
+                if let msg = decode(fileURL: url) { return msg }
+            }
+        }
+        return nil
+    }
+
     // MARK: - Helpers
 
     /// Load CGImage từ file URL dùng CGImageSource (hỗ trợ nhiều format hơn NSImage).
     private static func loadCGImage(from url: URL) -> CGImage? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
         return CGImageSourceCreateImageAtIndex(source, 0, nil)
-    }
-
-    // MARK: - Screen capture
-
-    /// Chạy `screencapture -i` cho người dùng chọn vùng, rồi decode QR.
-    /// Không cần quyền Screen Recording vì dùng tiện ích hệ thống.
-    /// completion(nil) nếu người dùng hủy hoặc không thấy QR.
-    static func captureScreenRegion(completion: @escaping (String?) -> Void) {
-        let tmp = FileManager.default.temporaryDirectory
-            .appendingPathComponent("otp-qr-\(UUID().uuidString).png")
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-        process.arguments = ["-i", "-x", tmp.path]
-        process.terminationHandler = { _ in
-            DispatchQueue.main.async {
-                defer { try? FileManager.default.removeItem(at: tmp) }
-                guard FileManager.default.fileExists(atPath: tmp.path) else {
-                    completion(nil); return   // người dùng nhấn Esc
-                }
-                completion(decode(fileURL: tmp))
-            }
-        }
-        do {
-            try process.run()
-        } catch {
-            print("DEBUG: screencapture lỗi: \(error)")
-            DispatchQueue.main.async { completion(nil) }   // luôn callback trên main như nhánh thành công
-        }
     }
 }

@@ -193,7 +193,7 @@ class Localization: ObservableObject {
         "otp_period": [.english: "Period (s)", .vietnamese: "Chu kỳ (giây)"],
         "otp_add_manual": [.english: "Manual entry", .vietnamese: "Nhập tay"],
         "otp_add_qr_image": [.english: "From QR image", .vietnamese: "Từ ảnh QR"],
-        "otp_add_screen": [.english: "Capture screen region", .vietnamese: "Chọn vùng màn hình"],
+        "otp_add_clipboard": [.english: "From clipboard image", .vietnamese: "Từ ảnh trong clipboard"],
         "otp_save": [.english: "Save", .vietnamese: "Lưu"],
         "otp_cancel": [.english: "Cancel", .vietnamese: "Hủy"],
         "otp_delete": [.english: "Delete", .vietnamese: "Xóa"],

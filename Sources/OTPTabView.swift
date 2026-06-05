@@ -57,7 +57,7 @@ struct OTPTabView: View {
             Menu {
                 Button(Localization.shared.localizedString("otp_add_manual")) { showingAdd = true }
                 Button(Localization.shared.localizedString("otp_add_qr_image")) { addFromQRImage() }
-                Button(Localization.shared.localizedString("otp_add_screen")) { addFromScreenRegion() }
+                Button(Localization.shared.localizedString("otp_add_clipboard")) { addFromClipboardImage() }
             } label: {
                 Label(Localization.shared.localizedString("otp_add"), systemImage: "plus")
             }.fixedSize()
@@ -105,30 +105,12 @@ struct OTPTabView: View {
         addParsed(parsed)
     }
 
-    private func addFromScreenRegion() {
-        // Đăng ký app vào danh sách Screen Recording + xin quyền (idempotent; chỉ hỏi lần đầu).
-        CGRequestScreenCaptureAccess()
-        // Ẩn popup trong lúc chọn vùng: (1) tránh popup (mức nổi) lọt vào ảnh chụp che mất QR,
-        // (2) click chọn vùng là sự kiện app khác → tránh global monitor tự đóng popup.
-        let popup = NSApp.windows.first { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("Clipboard") }
-        popup?.orderOut(nil)
-        // Trễ nhỏ để popup biến mất hẳn trước khi crosshair xuất hiện.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            QRDecoder.captureScreenRegion { msg in
-                popup?.makeKeyAndOrderFront(nil)   // hiện lại popup, không đóng
-                if let msg = msg, let parsed = OTPItem.parse(otpauthURI: msg) {
-                    addParsed(parsed)
-                } else if !CGPreflightScreenCaptureAccess() {
-                    // Chụp hỏng do thiếu quyền Quay màn hình ("could not create image from rect").
-                    statusMessage = Localization.shared.localizedString("otp_need_screen_permission")
-                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
-                        NSWorkspace.shared.open(url)
-                    }
-                } else {
-                    statusMessage = Localization.shared.localizedString("otp_qr_not_found")
-                }
-            }
+    /// Thêm OTP từ ảnh QR đang nằm trong clipboard (vd chụp màn hình bằng ⌃⌘⇧4, hoặc copy ảnh).
+    private func addFromClipboardImage() {
+        guard let msg = QRDecoder.decodeFromClipboard(), let parsed = OTPItem.parse(otpauthURI: msg) else {
+            statusMessage = Localization.shared.localizedString("otp_qr_not_found"); return
         }
+        addParsed(parsed)
     }
 
     private func addParsed(_ item: OTPItem) {
@@ -143,9 +125,9 @@ struct OTPTabView: View {
 // MARK: - moved from OTPManagerView.swift
 
 /// Nguồn thêm OTP được yêu cầu sẵn khi mở tab quản lý.
-enum OTPAddSource { case manual, qrImage, screenRegion }
+enum OTPAddSource { case manual, qrImage }
 
-/// Sheet thêm/sửa OTP: nhập tay + nút nhập QR ảnh / chọn vùng màn hình.
+/// Sheet thêm/sửa OTP: nhập tay + nút nhập QR từ ảnh file / ảnh trong clipboard.
 struct OTPEditSheet: View {
     let item: OTPItem?
     let onSave: (OTPItem) -> Bool
@@ -171,7 +153,7 @@ struct OTPEditSheet: View {
             if item == nil {
                 HStack {
                     Button(Localization.shared.localizedString("otp_add_qr_image")) { importQRImage() }
-                    Button(Localization.shared.localizedString("otp_add_screen")) { captureScreen() }
+                    Button(Localization.shared.localizedString("otp_add_clipboard")) { pasteFromClipboard() }
                 }
             }
 
@@ -216,7 +198,6 @@ struct OTPEditSheet: View {
             switch src {
             case .manual: break               // chỉ hiện form nhập tay
             case .qrImage: importQRImage()
-            case .screenRegion: captureScreen()
             }
         }
     }
@@ -236,13 +217,11 @@ struct OTPEditSheet: View {
         applyParsed(parsed)
     }
 
-    private func captureScreen() {
-        QRDecoder.captureScreenRegion { msg in
-            guard let msg = msg, let parsed = OTPItem.parse(otpauthURI: msg) else {
-                error = Localization.shared.localizedString("otp_qr_not_found"); return
-            }
-            applyParsed(parsed)
+    private func pasteFromClipboard() {
+        guard let msg = QRDecoder.decodeFromClipboard(), let parsed = OTPItem.parse(otpauthURI: msg) else {
+            error = Localization.shared.localizedString("otp_qr_not_found"); return
         }
+        applyParsed(parsed)
     }
 
     private func save() {
