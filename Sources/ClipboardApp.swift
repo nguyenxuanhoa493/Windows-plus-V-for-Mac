@@ -318,6 +318,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }, onManageOTP: { [weak panel] in
             panel?.close()
             OTPManagerWindow.shared.show()
+        }, onAddOTP: { [weak panel] source in
+            panel?.close()
+            OTPManagerWindow.shared.show(add: source)
         })
         let hostingView = NSHostingView(rootView: view)
         hostingView.frame = NSRect(origin: .zero, size: popoverSize)

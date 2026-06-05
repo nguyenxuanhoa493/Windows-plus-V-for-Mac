@@ -69,6 +69,7 @@ class Localization: ObservableObject {
         "filter_image": [.english: "Images", .vietnamese: "Hình ảnh"],
         "filter_file": [.english: "Files", .vietnamese: "Tệp tin"],
         "filter_bookmark": [.english: "Bookmarks", .vietnamese: "Bookmark"],
+        "filter_otp": [.english: "OTP", .vietnamese: "OTP"],
         // Search & actions
         "search_placeholder": [.english: "Search...", .vietnamese: "Tìm kiếm..."],
         "search_tooltip": [.english: "Search", .vietnamese: "Tìm kiếm"],

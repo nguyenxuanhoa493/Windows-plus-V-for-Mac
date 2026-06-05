@@ -8,6 +8,7 @@ enum ContentFilter: String, CaseIterable {
     case image
     case file
     case bookmark
+    case otp
 
     var localizationKey: String {
         switch self {
@@ -16,6 +17,7 @@ enum ContentFilter: String, CaseIterable {
         case .image: return "filter_image"
         case .file: return "filter_file"
         case .bookmark: return "filter_bookmark"
+        case .otp: return "filter_otp"
         }
     }
 
@@ -30,6 +32,7 @@ enum ContentFilter: String, CaseIterable {
         case .image: return "photo"
         case .file: return "doc"
         case .bookmark: return "bookmark"
+        case .otp: return "lock.shield"
         }
     }
 
@@ -40,6 +43,7 @@ enum ContentFilter: String, CaseIterable {
         case .image: return .green
         case .file: return .orange
         case .bookmark: return .blue
+        case .otp: return .purple
         }
     }
 }
@@ -54,7 +58,9 @@ struct ClipboardHistoryView: View {
     let onToggleBookmark: ((ClipboardItem) -> Void)?
     let onPasteOTP: ((String) -> Void)?
     let onManageOTP: (() -> Void)?
+    let onAddOTP: ((OTPAddSource) -> Void)?
     @ObservedObject private var settings = Settings.shared
+    @ObservedObject private var otpManager = OTPManager.shared
     @State private var selectedFilter: ContentFilter = .all
     @State private var isSearching = false
     @State private var searchText = ""
@@ -63,7 +69,8 @@ struct ClipboardHistoryView: View {
     @State private var isSearchFieldFocused = false
     @State private var keyboardMonitor: Any?
     @State private var selectedIndex: Int = 0
-    @State private var showOTPTab = false
+    @State private var otpNow = Date()
+    private let otpTicker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     // Helper để check file có phải ảnh không
     private func isImageFile(_ item: ClipboardItem) -> Bool {
@@ -110,6 +117,8 @@ struct ClipboardHistoryView: View {
             result = items.filter { $0.type == .file && !$0.isBookmarked }
         case .bookmark:
             result = items.filter { $0.isBookmarked }
+        case .otp:
+            result = []
         }
         
         if !debouncedSearchText.isEmpty {
@@ -165,44 +174,15 @@ struct ClipboardHistoryView: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            if settings.enableOTP {
-                HStack(spacing: 0) {
-                    tabButton(titleKey: "clipboard_tab", active: !showOTPTab) { showOTPTab = false }
-                    tabButton(titleKey: "otp_tab", active: showOTPTab) { showOTPTab = true }
-                }
-                .padding(.horizontal, 8).padding(.top, 6)
-            }
-
-            if showOTPTab && settings.enableOTP {
-                OTPView(
-                    onPasteCode: { code in onPasteOTP?(code) },
-                    onManage: { onManageOTP?() }
-                )
-            } else {
-                clipboardContent
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func tabButton(titleKey: String, active: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(Localization.shared.localizedString(titleKey))
-                .font(.system(size: 12, weight: active ? .semibold : .regular))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
-                .background(active ? settings.themedAccent.opacity(0.2) : Color.clear)
-                .foregroundColor(active ? settings.themedAccent : .secondary)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-        }.buttonStyle(.plain)
+        clipboardContent
+            .onReceive(otpTicker) { otpNow = $0 }
     }
 
     private var clipboardContent: some View {
         VStack(spacing: 0) {
             // Filter bar - có thể kéo để move window
             HStack(spacing: 8) {
-                ForEach(ContentFilter.allCases, id: \.self) { filter in
+                ForEach(ContentFilter.allCases.filter { $0 != .otp || settings.enableOTP }, id: \.self) { filter in
                     PillIconButton(
                         systemImage: filter.icon,
                         isActive: selectedFilter == filter,
@@ -311,8 +291,11 @@ struct ClipboardHistoryView: View {
                 ScrollView(showsIndicators: false) {
                     // Anchor cho scroll-to-top
                     Color.clear.frame(height: 0).id("__top__")
+                    if settings.enableOTP && (selectedFilter == .all || selectedFilter == .otp) {
+                        otpSection
+                    }
                     if filteredItems.isEmpty {
-                        emptyState
+                        if selectedFilter != .otp { emptyState }
                     } else {
                         LazyVStack(spacing: settings.useNativeUI ? 0 : 8) {
                             ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
@@ -367,6 +350,68 @@ struct ClipboardHistoryView: View {
         .onDisappear {
             removeKeyboardMonitor()
         }
+    }
+
+    @ViewBuilder
+    private var otpSection: some View {
+        let otpList = otpManager.search(debouncedSearchText)
+        if selectedFilter == .otp {
+            HStack {
+                Menu {
+                    Button(Localization.shared.localizedString("otp_add_manual")) { onAddOTP?(.manual) }
+                    Button(Localization.shared.localizedString("otp_add_qr_image")) { onAddOTP?(.qrImage) }
+                    Button(Localization.shared.localizedString("otp_add_screen")) { onAddOTP?(.screenRegion) }
+                    Divider()
+                    Button(Localization.shared.localizedString("otp_manage")) { onManageOTP?() }
+                } label: {
+                    Label(Localization.shared.localizedString("otp_add"), systemImage: "plus")
+                }
+                .fixedSize()
+                Spacer()
+            }
+            .padding(.horizontal, 12).padding(.top, 6)
+        }
+        if otpList.isEmpty {
+            if selectedFilter == .otp {
+                Text(Localization.shared.localizedString("otp_empty"))
+                    .font(.system(size: 12)).foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity).padding()
+            }
+        } else {
+            LazyVStack(spacing: 8) {
+                ForEach(otpList) { item in otpRow(item) }
+            }
+            .padding(.horizontal, 8).padding(.vertical, 4)
+        }
+    }
+
+    private func otpRow(_ item: OTPItem) -> some View {
+        let code = item.code(at: otpNow) ?? "------"
+        let remaining = item.secondsRemaining(at: otpNow)
+        return Button(action: { onPasteOTP?(code) }) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.name).font(.system(size: 12, weight: .medium))
+                        .foregroundColor(settings.themedForeground)
+                    if let iss = item.issuer, !iss.isEmpty {
+                        Text(iss).font(.system(size: 10)).foregroundColor(.secondary)
+                    }
+                }
+                Spacer()
+                Text(code).font(.system(size: 16, weight: .semibold, design: .monospaced))
+                    .foregroundColor(settings.themedAccent)
+                ZStack {
+                    Circle().stroke(Color.secondary.opacity(0.3), lineWidth: 2)
+                    Circle().trim(from: 0, to: CGFloat(remaining) / CGFloat(max(item.period, 1)))
+                        .stroke(settings.themedAccent, lineWidth: 2)
+                        .rotationEffect(.degrees(-90))
+                    Text("\(remaining)").font(.system(size: 9))
+                }.frame(width: 22, height: 22)
+            }
+            .padding(10)
+            .background(RoundedRectangle(cornerRadius: 8).fill(settings.themedSurface))
+        }.buttonStyle(.plain)
     }
 
     @ViewBuilder
