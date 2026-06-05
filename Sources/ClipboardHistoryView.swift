@@ -173,7 +173,13 @@ struct ClipboardHistoryView: View {
     
     var body: some View {
         clipboardContent
-            .onReceive(otpTicker) { otpNow = $0 }
+            .onReceive(otpTicker) { date in
+                // Chỉ cập nhật khi OTP đang hiển thị, tránh re-render cả list mỗi giây
+                // (gây giật animation viền item clipboard).
+                if settings.enableOTP && (selectedFilter == .otp || !debouncedSearchText.isEmpty) {
+                    otpNow = date
+                }
+            }
     }
 
     private var clipboardContent: some View {
@@ -1384,27 +1390,29 @@ struct ClipboardItemView: View {
                 .fill(Color(NSColor.separatorColor))
                 .frame(height: 0.5)
                 .frame(maxHeight: .infinity, alignment: .bottom)
-        } else if isHovered {
-            // Viền gradient chuyển động (quét vòng quanh) khi hover.
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(
-                    AngularGradient(
-                        gradient: Gradient(colors: [
-                            settings.themedAccent.opacity(0.0),
-                            settings.themedAccent,
-                            settings.themedAccent.opacity(0.0),
-                            settings.themedAccent.opacity(0.0)
-                        ]),
-                        center: .center,
-                        angle: .degrees(borderAngle)
-                    ),
-                    lineWidth: 2
-                )
         } else {
+            // Một RoundedRectangle duy nhất (giữ identity ổn định, không nháy) — chỉ đổi style.
             RoundedRectangle(cornerRadius: 8)
-                .stroke(isSelected ? settings.themedAccent : Color.gray.opacity(0.3),
-                        lineWidth: isSelected ? 1.5 : 1)
+                .strokeBorder(borderStyle, lineWidth: isHovered ? 2 : (isSelected ? 1.5 : 1))
         }
+    }
+
+    /// Viền: hover → gradient góc xoay (chuyển động); chọn → accent; mặc định → xám.
+    private var borderStyle: AnyShapeStyle {
+        if isHovered {
+            return AnyShapeStyle(AngularGradient(
+                gradient: Gradient(colors: [
+                    settings.themedAccent.opacity(0.0),
+                    settings.themedAccent,
+                    settings.themedAccent.opacity(0.0),
+                    settings.themedAccent.opacity(0.0)
+                ]),
+                center: .center,
+                angle: .degrees(borderAngle)
+            ))
+        }
+        if isSelected { return AnyShapeStyle(settings.themedAccent) }
+        return AnyShapeStyle(Color.gray.opacity(0.3))
     }
 
     private func updateDisplayText() {

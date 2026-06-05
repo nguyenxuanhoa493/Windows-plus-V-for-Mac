@@ -299,8 +299,12 @@ struct OTPRowView: View {
         .onHover { h in
             withAnimation(.easeOut(duration: 0.18)) { hovered = h }
             if h {
-                shine = -1
-                withAnimation(.easeInOut(duration: 0.75)) { shine = 1 }
+                // Reset không animation ở tick này, rồi quét ở tick sau → lặp lại mỗi lần hover.
+                var t = Transaction(); t.disablesAnimations = true
+                withTransaction(t) { shine = -1 }
+                DispatchQueue.main.async {
+                    withAnimation(.easeInOut(duration: 0.75)) { shine = 1 }
+                }
             }
         }
         .contextMenu {
