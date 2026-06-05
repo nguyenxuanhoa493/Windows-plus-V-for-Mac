@@ -29,9 +29,7 @@ struct OTPLockView: View {
             Spacer()
             Image(systemName: "lock.fill").font(.system(size: 32)).foregroundColor(.secondary)
             Text(Localization.shared.localizedString("otp_unlock_title")).font(.system(size: 13, weight: .medium))
-            SecureField(Localization.shared.localizedString("otp_enter_pin"), text: $pin)
-                .textFieldStyle(.roundedBorder).frame(width: 180)
-                .onChange(of: pin) { v in if v.count >= 6 { submitPIN() } }
+            PINEntryView(pin: $pin, onComplete: submitPIN)
             if auth.biometricsAvailable {
                 Button(action: attemptBiometrics) {
                     Label(Localization.shared.localizedString("otp_unlock_touchid"), systemImage: "touchid")
@@ -53,10 +51,12 @@ struct OTPLockView: View {
             Spacer()
             Image(systemName: "lock.shield").font(.system(size: 32)).foregroundColor(.secondary)
             Text(Localization.shared.localizedString("otp_setup_pin_title")).font(.system(size: 13, weight: .medium))
-            SecureField(Localization.shared.localizedString("otp_enter_pin"), text: $pin)
-                .textFieldStyle(.roundedBorder).frame(width: 180)
-            SecureField(Localization.shared.localizedString("otp_setup_pin_confirm"), text: $confirmPin)
-                .textFieldStyle(.roundedBorder).frame(width: 180)
+            Text(Localization.shared.localizedString("otp_enter_pin"))
+                .font(.system(size: 11)).foregroundColor(.secondary)
+            PINEntryView(pin: $pin)
+            Text(Localization.shared.localizedString("otp_setup_pin_confirm"))
+                .font(.system(size: 11)).foregroundColor(.secondary)
+            PINEntryView(pin: $confirmPin, autoFocus: false, onComplete: submitNewPIN)
             if !errorMessage.isEmpty {
                 Text(errorMessage).font(.system(size: 11)).foregroundColor(.red)
             }
