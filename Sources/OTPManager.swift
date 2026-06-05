@@ -20,7 +20,7 @@ final class OTPManager: ObservableObject {
 
     // MARK: - Persistence
     private func loadList() {
-        guard let data = KeychainHelper.load(account: listAccount),
+        guard let data = OTPStore.load(account: listAccount),
               let decoded = try? JSONDecoder().decode([OTPItem].self, from: data) else {
             items = []
             return
@@ -30,10 +30,10 @@ final class OTPManager: ObservableObject {
 
     private func persist() {
         guard let data = try? JSONEncoder().encode(items) else { return }
-        let ok = KeychainHelper.save(data, account: listAccount)
+        let ok = OTPStore.save(data, account: listAccount)
         if !ok {
-            print("DEBUG: OTPManager persist thất bại — không ghi được Keychain")
-            return   // state trên bộ nhớ ≠ Keychain → không post notification
+            print("DEBUG: OTPManager persist thất bại — không ghi được store")
+            return   // state trên bộ nhớ ≠ file → không post notification
         }
         NotificationCenter.default.post(name: .otpListChanged, object: nil)
     }

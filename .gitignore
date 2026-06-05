@@ -75,3 +75,9 @@ xcuserdata/
 # fastlane/Preview.html
 # fastlane/screenshots/**/*.png
 # fastlane/test_output
+# Build artifacts & local tooling (không commit)
+Clipboard.app/
+*.dmg
+*.zip
+.mcp.json
+.codegraph/

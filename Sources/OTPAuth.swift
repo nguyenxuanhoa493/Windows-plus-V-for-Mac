@@ -25,7 +25,7 @@ final class OTPAuth {
     private func currentRecord() -> PINRecord? {
         if !didLoad {
             didLoad = true
-            if let data = KeychainHelper.load(account: pinAccount) {
+            if let data = OTPStore.load(account: pinAccount) {
                 loadedRecord = try? JSONDecoder().decode(PINRecord.self, from: data)
             }
         }
@@ -56,7 +56,7 @@ final class OTPAuth {
         let hash = Self.hash(pin: pin, salt: salt)
         let record = PINRecord(salt: salt, hash: hash)
         if let data = try? JSONEncoder().encode(record) {
-            KeychainHelper.save(data, account: pinAccount)
+            OTPStore.save(data, account: pinAccount)
         }
         loadedRecord = record   // cập nhật cache, khỏi đọc lại Keychain
         didLoad = true
