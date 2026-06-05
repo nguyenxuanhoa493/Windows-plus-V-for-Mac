@@ -156,13 +156,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         settingsItem.target = self
         menu.addItem(settingsItem)
 
-        if Settings.shared.enableOTP {
-            let otpItem = NSMenuItem(title: Localization.shared.localizedString("otp_manage"),
-                                     action: #selector(openOTPManager), keyEquivalent: "o")
-            otpItem.target = self
-            menu.addItem(otpItem)
-        }
-
         menu.addItem(NSMenuItem.separator())
 
         let updateItem = NSMenuItem(title: Localization.shared.localizedString("check_for_updates"), action: #selector(checkForUpdates), keyEquivalent: "u")
@@ -315,12 +308,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }, onPasteOTP: { [weak self, weak panel] code in
             panel?.close()
             self?.handleOTPPaste(code)
-        }, onManageOTP: { [weak panel] in
-            panel?.close()
-            OTPManagerWindow.shared.show()
-        }, onAddOTP: { [weak panel] source in
-            panel?.close()
-            OTPManagerWindow.shared.show(add: source)
         })
         let hostingView = NSHostingView(rootView: view)
         hostingView.frame = NSRect(origin: .zero, size: popoverSize)
@@ -407,10 +394,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         print("DEBUG: Cửa sổ cài đặt đã được mở")
     }
 
-    @objc private func openOTPManager() {
-        OTPManagerWindow.shared.show()
-    }
-    
     @objc func checkForUpdates() {
         UpdateManager.shared.checkForUpdates()
     }

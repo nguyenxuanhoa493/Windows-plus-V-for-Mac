@@ -100,8 +100,8 @@ final class OTPManager: ObservableObject {
     }
 
     func markUnlocked() {
-        let minutes = Settings.shared.otpGracePeriodMinutes
-        unlockedUntil = Date().addingTimeInterval(TimeInterval(minutes * 60))
+        // Mở khóa cho tới khi thoát app (xác nhận 1 lần mỗi lần mở app).
+        unlockedUntil = .distantFuture
     }
 
     func lock() { unlockedUntil = nil }

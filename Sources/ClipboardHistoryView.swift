@@ -57,8 +57,6 @@ struct ClipboardHistoryView: View {
     let onDeleteItem: ((ClipboardItem) -> Void)?
     let onToggleBookmark: ((ClipboardItem) -> Void)?
     let onPasteOTP: ((String) -> Void)?
-    let onManageOTP: (() -> Void)?
-    let onAddOTP: ((OTPAddSource) -> Void)?
     @ObservedObject private var settings = Settings.shared
     @ObservedObject private var otpManager = OTPManager.shared
     @State private var selectedFilter: ContentFilter = .all
@@ -291,7 +289,7 @@ struct ClipboardHistoryView: View {
                 ScrollView(showsIndicators: false) {
                     // Anchor cho scroll-to-top
                     Color.clear.frame(height: 0).id("__top__")
-                    if settings.enableOTP && (selectedFilter == .all || selectedFilter == .otp) {
+                    if settings.enableOTP && (selectedFilter == .otp || !debouncedSearchText.isEmpty) {
                         otpSection
                     }
                     if filteredItems.isEmpty {
@@ -354,64 +352,43 @@ struct ClipboardHistoryView: View {
 
     @ViewBuilder
     private var otpSection: some View {
-        let otpList = otpManager.search(debouncedSearchText)
         if selectedFilter == .otp {
-            HStack {
-                Menu {
-                    Button(Localization.shared.localizedString("otp_add_manual")) { onAddOTP?(.manual) }
-                    Button(Localization.shared.localizedString("otp_add_qr_image")) { onAddOTP?(.qrImage) }
-                    Button(Localization.shared.localizedString("otp_add_screen")) { onAddOTP?(.screenRegion) }
-                    Divider()
-                    Button(Localization.shared.localizedString("otp_manage")) { onManageOTP?() }
-                } label: {
-                    Label(Localization.shared.localizedString("otp_add"), systemImage: "plus")
-                }
-                .fixedSize()
-                Spacer()
-            }
-            .padding(.horizontal, 12).padding(.top, 6)
-        }
-        if otpList.isEmpty {
-            if selectedFilter == .otp {
-                Text(Localization.shared.localizedString("otp_empty"))
-                    .font(.system(size: 12)).foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity).padding()
-            }
+            OTPTabView(onPasteCode: { onPasteOTP?($0) }, searchText: debouncedSearchText)
         } else {
-            LazyVStack(spacing: 8) {
-                ForEach(otpList) { item in otpRow(item) }
+            // Kết quả tìm kiếm ở filter khác: chỉ hiện OTP khớp từ khóa.
+            let list = otpManager.search(debouncedSearchText)
+            if !list.isEmpty {
+                LazyVStack(spacing: 8) {
+                    ForEach(list) { item in otpSearchRow(item) }
+                }.padding(.horizontal, 8).padding(.vertical, 4)
             }
-            .padding(.horizontal, 8).padding(.vertical, 4)
         }
     }
 
-    private func otpRow(_ item: OTPItem) -> some View {
-        let code = item.code(at: otpNow) ?? "------"
-        let remaining = item.secondsRemaining(at: otpNow)
-        return Button(action: { onPasteOTP?(code) }) {
+    /// Dòng OTP trong kết quả tìm kiếm: khóa thì chỉ hiện tên, mở khóa thì hiện mã + paste.
+    private func otpSearchRow(_ item: OTPItem) -> some View {
+        let unlocked = otpManager.isUnlocked
+        return Button(action: {
+            if unlocked, let c = item.code(at: otpNow) { onPasteOTP?(c) }
+        }) {
             HStack {
+                Image(systemName: "lock.shield").font(.system(size: 12)).foregroundColor(.purple)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(item.name).font(.system(size: 12, weight: .medium))
-                        .foregroundColor(settings.themedForeground)
-                    if let iss = item.issuer, !iss.isEmpty {
-                        Text(iss).font(.system(size: 10)).foregroundColor(.secondary)
-                    }
+                    Text(item.name).font(.system(size: 12, weight: .medium)).foregroundColor(settings.themedForeground)
+                    if let iss = item.issuer, !iss.isEmpty { Text(iss).font(.system(size: 10)).foregroundColor(.secondary) }
                 }
                 Spacer()
-                Text(code).font(.system(size: 16, weight: .semibold, design: .monospaced))
-                    .foregroundColor(settings.themedAccent)
-                ZStack {
-                    Circle().stroke(Color.secondary.opacity(0.3), lineWidth: 2)
-                    Circle().trim(from: 0, to: CGFloat(remaining) / CGFloat(max(item.period, 1)))
-                        .stroke(settings.themedAccent, lineWidth: 2)
-                        .rotationEffect(.degrees(-90))
-                    Text("\(remaining)").font(.system(size: 9))
-                }.frame(width: 22, height: 22)
+                if unlocked {
+                    Text(item.code(at: otpNow) ?? "------")
+                        .font(.system(size: 16, weight: .semibold, design: .monospaced))
+                        .foregroundColor(settings.themedAccent)
+                } else {
+                    Image(systemName: "lock.fill").foregroundColor(.secondary)
+                }
             }
             .padding(10)
             .background(RoundedRectangle(cornerRadius: 8).fill(settings.themedSurface))
-        }.buttonStyle(.plain)
+        }.buttonStyle(.plain).disabled(!unlocked)
     }
 
     @ViewBuilder

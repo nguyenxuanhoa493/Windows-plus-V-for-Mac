@@ -2,96 +2,102 @@ import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
 
-/// Nguồn thêm OTP được yêu cầu sẵn khi mở cửa sổ quản lý.
-enum OTPAddSource { case manual, qrImage, screenRegion }
+/// Toàn bộ trải nghiệm OTP nằm trong tab OTP của popup chính (không còn cửa sổ riêng):
+/// khóa PIN/Touch ID, danh sách mã + đếm ngược, thêm/sửa/xóa, export/import.
+struct OTPTabView: View {
+    let onPasteCode: (String) -> Void
+    var searchText: String = ""
 
-struct OTPManagerView: View {
-    @ObservedObject private var manager = OTPManager.shared
+    @ObservedObject private var otpManager = OTPManager.shared
+    @ObservedObject private var settings = Settings.shared
     private let auth = OTPAuth.shared
 
-    var initialAddSource: OTPAddSource? = nil
-
     @State private var unlocked = OTPManager.shared.isUnlocked
+    @State private var otpNow = Date()
     @State private var showingAdd = false
+    @State private var pendingAddSource: OTPAddSource?
     @State private var editingItem: OTPItem?
     @State private var statusMessage = ""
-    @State private var pendingAddSource: OTPAddSource?
-    @State private var didTriggerInitialSource = false
+
+    private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
         Group {
-            if unlocked {
-                mainContent
-            } else {
-                OTPLockView(onUnlocked: { unlocked = true })
-            }
+            if unlocked { management } else { OTPLockView(onUnlocked: { unlocked = true }) }
         }
-        .frame(minWidth: 460, minHeight: 520)
+        .onReceive(ticker) { otpNow = $0 }
     }
 
-    private var mainContent: some View {
+    private var management: some View {
         VStack(spacing: 0) {
             header
-            Divider()
-            if manager.items.isEmpty {
-                Spacer()
+            let list = otpManager.search(searchText)
+            if list.isEmpty {
                 Text(Localization.shared.localizedString("otp_empty"))
-                    .foregroundColor(.secondary)
-                Spacer()
+                    .font(.system(size: 12)).foregroundColor(.secondary)
+                    .multilineTextAlignment(.center).frame(maxWidth: .infinity).padding()
             } else {
-                List {
-                    ForEach(manager.items) { item in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(item.name).font(.system(size: 13, weight: .medium))
-                                if let iss = item.issuer, !iss.isEmpty {
-                                    Text(iss).font(.system(size: 11)).foregroundColor(.secondary)
-                                }
-                            }
-                            Spacer()
-                            Button(action: { editingItem = item }) { Image(systemName: "pencil") }
-                                .buttonStyle(.plain)
-                            Button(action: { manager.delete(item) }) { Image(systemName: "trash") }
-                                .buttonStyle(.plain).foregroundColor(.red)
-                        }
-                    }
-                }
+                LazyVStack(spacing: 8) {
+                    ForEach(list) { item in row(item) }
+                }.padding(.horizontal, 8).padding(.vertical, 4)
             }
             if !statusMessage.isEmpty {
                 Text(statusMessage).font(.system(size: 11)).foregroundColor(.secondary).padding(6)
             }
         }
-        .onAppear {
-            guard !didTriggerInitialSource, let src = initialAddSource else { return }
-            didTriggerInitialSource = true
-            pendingAddSource = src
-            showingAdd = true
-        }
         .sheet(isPresented: $showingAdd, onDismiss: { pendingAddSource = nil }) {
-            OTPEditSheet(item: nil, onSave: { newItem in manager.add(newItem) }, initialSource: pendingAddSource)
+            OTPEditSheet(item: nil, onSave: { otpManager.add($0) }, initialSource: pendingAddSource)
         }
         .sheet(item: $editingItem) { item in
-            OTPEditSheet(item: item) { updated in manager.update(updated) }
+            OTPEditSheet(item: item, onSave: { otpManager.update($0) })
         }
     }
 
     private var header: some View {
-        HStack {
-            Button(action: { showingAdd = true }) {
+        HStack(spacing: 8) {
+            Menu {
+                Button(Localization.shared.localizedString("otp_add_manual")) { pendingAddSource = .manual; showingAdd = true }
+                Button(Localization.shared.localizedString("otp_add_qr_image")) { pendingAddSource = .qrImage; showingAdd = true }
+                Button(Localization.shared.localizedString("otp_add_screen")) { pendingAddSource = .screenRegion; showingAdd = true }
+            } label: {
                 Label(Localization.shared.localizedString("otp_add"), systemImage: "plus")
-            }
+            }.fixedSize()
             Spacer()
             Button(Localization.shared.localizedString("otp_export")) { exportTapped() }
             Button(Localization.shared.localizedString("otp_import")) { importTapped() }
-        }.padding(10)
+        }.padding(.horizontal, 12).padding(.vertical, 6)
     }
 
-    // MARK: - Export / Import
-    private func exportTapped() {
-        // Yêu cầu PIN (dùng làm passphrase). Nếu chưa có PIN, không cho export.
-        guard auth.hasPIN else {
-            statusMessage = Localization.shared.localizedString("otp_unlock_title"); return
+    private func row(_ item: OTPItem) -> some View {
+        let code = item.code(at: otpNow) ?? "------"
+        let remaining = item.secondsRemaining(at: otpNow)
+        return HStack {
+            Button(action: { onPasteCode(code) }) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.name).font(.system(size: 12, weight: .medium)).foregroundColor(settings.themedForeground)
+                        if let iss = item.issuer, !iss.isEmpty { Text(iss).font(.system(size: 10)).foregroundColor(.secondary) }
+                    }
+                    Spacer()
+                    Text(code).font(.system(size: 16, weight: .semibold, design: .monospaced)).foregroundColor(settings.themedAccent)
+                    ZStack {
+                        Circle().stroke(Color.secondary.opacity(0.3), lineWidth: 2)
+                        Circle().trim(from: 0, to: CGFloat(remaining)/CGFloat(max(item.period, 1)))
+                            .stroke(settings.themedAccent, lineWidth: 2).rotationEffect(.degrees(-90))
+                        Text("\(remaining)").font(.system(size: 9))
+                    }.frame(width: 22, height: 22)
+                }
+            }.buttonStyle(.plain)
+            Button(action: { editingItem = item }) { Image(systemName: "pencil") }.buttonStyle(.plain).foregroundColor(.secondary)
+            Button(action: { otpManager.delete(item) }) { Image(systemName: "trash") }.buttonStyle(.plain).foregroundColor(.red)
         }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 8).fill(settings.themedSurface))
+    }
+
+    // MARK: - Export / Import  (chuyển từ OTPManagerView)
+    private func exportTapped() {
+        guard auth.hasPIN else { statusMessage = Localization.shared.localizedString("otp_setup_pin_title"); return }
         let alert = NSAlert()
         alert.messageText = Localization.shared.localizedString("otp_export")
         alert.informativeText = Localization.shared.localizedString("otp_export_warning")
@@ -102,14 +108,12 @@ struct OTPManagerView: View {
         alert.accessoryView = input
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         let pin = input.stringValue
-        guard auth.verifyPIN(pin) else {
-            statusMessage = Localization.shared.localizedString("otp_pin_wrong"); return
-        }
+        guard auth.verifyPIN(pin) else { statusMessage = Localization.shared.localizedString("otp_pin_wrong"); return }
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "clipboard-otp-backup.enc"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
-            let data = try manager.exportData(pin: pin)
+            let data = try otpManager.exportData(pin: pin)
             try data.write(to: url)
             statusMessage = "✅"
         } catch {
@@ -133,13 +137,18 @@ struct OTPManagerView: View {
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         do {
             let data = try Data(contentsOf: url)
-            let added = try manager.importData(data, pin: input.stringValue)
+            let added = try otpManager.importData(data, pin: input.stringValue)
             statusMessage = String(format: Localization.shared.localizedString("otp_import_done"), added)
         } catch {
             statusMessage = Localization.shared.localizedString("otp_import_failed")
         }
     }
 }
+
+// MARK: - moved from OTPManagerView.swift
+
+/// Nguồn thêm OTP được yêu cầu sẵn khi mở tab quản lý.
+enum OTPAddSource { case manual, qrImage, screenRegion }
 
 /// Sheet thêm/sửa OTP: nhập tay + nút nhập QR ảnh / chọn vùng màn hình.
 struct OTPEditSheet: View {
