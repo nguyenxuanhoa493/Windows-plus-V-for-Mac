@@ -371,27 +371,31 @@ struct ClipboardHistoryView: View {
         return Button(action: {
             if unlocked, let c = item.code(at: otpNow) { onPasteOTP?(c) }
         }) {
-            HStack(spacing: 12) {
-                Image(systemName: "lock.shield.fill").font(.system(size: 16)).foregroundColor(settings.themedAccent)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(item.name).font(.system(size: 15, weight: .semibold)).foregroundColor(settings.themedForeground)
-                    if let iss = item.issuer, !iss.isEmpty { Text(iss).font(.system(size: 12)).foregroundStyle(.secondary) }
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 10) {
+                    Image(systemName: "lock.shield.fill").font(.system(size: 15)).foregroundColor(settings.themedAccent)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.name).font(.system(size: 15, weight: .semibold)).foregroundColor(settings.themedForeground)
+                        if let iss = item.issuer, !iss.isEmpty { Text(iss).font(.system(size: 11)).foregroundStyle(.secondary) }
+                    }
+                    Spacer()
+                    if !unlocked { Image(systemName: "lock.fill").foregroundStyle(.secondary) }
                 }
-                Spacer(minLength: 8)
                 if unlocked {
-                    Text(item.code(at: otpNow) ?? "------")
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .monospacedDigit().foregroundColor(settings.themedAccent)
                     let remaining = item.secondsRemaining(at: otpNow)
-                    ZStack {
-                        Circle().stroke(Color.secondary.opacity(0.25), lineWidth: 3)
-                        Circle().trim(from: 0, to: CGFloat(remaining) / CGFloat(max(item.period, 1)))
-                            .stroke(settings.themedAccent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                            .rotationEffect(.degrees(-90))
-                        Text("\(remaining)").font(.system(size: 11, weight: .medium)).monospacedDigit()
-                    }.frame(width: 30, height: 30)
-                } else {
-                    Image(systemName: "lock.fill").foregroundStyle(.secondary)
+                    HStack(spacing: 12) {
+                        Text(item.code(at: otpNow) ?? "------")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .monospacedDigit().foregroundColor(settings.themedAccent)
+                        Spacer()
+                        ZStack {
+                            Circle().stroke(Color.secondary.opacity(0.25), lineWidth: 3)
+                            Circle().trim(from: 0, to: CGFloat(remaining) / CGFloat(max(item.period, 1)))
+                                .stroke(settings.themedAccent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                                .rotationEffect(.degrees(-90))
+                            Text("\(remaining)").font(.system(size: 11, weight: .medium)).monospacedDigit()
+                        }.frame(width: 30, height: 30)
+                    }
                 }
             }
             .padding(.horizontal, 14).padding(.vertical, 12)
@@ -862,6 +866,7 @@ struct ClipboardItemView: View {
     let onDeleteItem: ((ClipboardItem) -> Void)?
     let onToggleBookmark: ((ClipboardItem) -> Void)?
     @State private var isHovered = false
+    @State private var borderAngle: Double = 0   // góc xoay viền gradient khi hover
     @State private var showAsDateTime = false
     @State private var showAsTable = false
     @State private var showAsJSON = false
@@ -1319,6 +1324,15 @@ struct ClipboardItemView: View {
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovered = hovering
             }
+            // Viền gradient xoay liên tục khi hover (dừng khi rời chuột).
+            if hovering {
+                borderAngle = 0
+                withAnimation(.linear(duration: 2.5).repeatForever(autoreverses: false)) {
+                    borderAngle = 360
+                }
+            } else {
+                withAnimation(.linear(duration: 0.2)) { borderAngle = 0 }
+            }
             if hovering {
                 NSCursor.pointingHand.push()
             } else {
@@ -1370,6 +1384,22 @@ struct ClipboardItemView: View {
                 .fill(Color(NSColor.separatorColor))
                 .frame(height: 0.5)
                 .frame(maxHeight: .infinity, alignment: .bottom)
+        } else if isHovered {
+            // Viền gradient chuyển động (quét vòng quanh) khi hover.
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(
+                    AngularGradient(
+                        gradient: Gradient(colors: [
+                            settings.themedAccent.opacity(0.0),
+                            settings.themedAccent,
+                            settings.themedAccent.opacity(0.0),
+                            settings.themedAccent.opacity(0.0)
+                        ]),
+                        center: .center,
+                        angle: .degrees(borderAngle)
+                    ),
+                    lineWidth: 2
+                )
         } else {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(isSelected ? settings.themedAccent : Color.gray.opacity(0.3),

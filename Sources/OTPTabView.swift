@@ -263,24 +263,28 @@ struct OTPRowView: View {
         let code = item.code(at: now) ?? "------"
         let remaining = item.secondsRemaining(at: now)
         return Button(action: { onPaste(code) }) {
-            HStack(spacing: 14) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(item.name).font(.system(size: 16, weight: .semibold))
+            VStack(alignment: .leading, spacing: 10) {
+                // Hàng 1: tên + issuer
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.name).font(.system(size: 15, weight: .semibold))
                         .foregroundColor(settings.themedForeground)
                     if let iss = item.issuer, !iss.isEmpty {
-                        Text(iss).font(.system(size: 12)).foregroundStyle(.secondary)
+                        Text(iss).font(.system(size: 11)).foregroundStyle(.secondary)
                     }
                 }
-                Spacer(minLength: 8)
-                Text(code).font(.system(size: 24, weight: .bold, design: .rounded))
-                    .monospacedDigit().foregroundColor(settings.themedAccent)
-                ZStack {
-                    Circle().stroke(Color.secondary.opacity(0.25), lineWidth: 3)
-                    Circle().trim(from: 0, to: CGFloat(remaining)/CGFloat(max(item.period, 1)))
-                        .stroke(settings.themedAccent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                    Text("\(remaining)").font(.system(size: 12, weight: .medium)).monospacedDigit()
-                }.frame(width: 34, height: 34)
+                // Hàng 2: mã OTP + đếm ngược
+                HStack(spacing: 12) {
+                    Text(code).font(.system(size: 30, weight: .bold, design: .rounded))
+                        .monospacedDigit().foregroundColor(settings.themedAccent)
+                    Spacer()
+                    ZStack {
+                        Circle().stroke(Color.secondary.opacity(0.25), lineWidth: 3)
+                        Circle().trim(from: 0, to: CGFloat(remaining)/CGFloat(max(item.period, 1)))
+                            .stroke(settings.themedAccent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                            .rotationEffect(.degrees(-90))
+                        Text("\(remaining)").font(.system(size: 12, weight: .medium)).monospacedDigit()
+                    }.frame(width: 34, height: 34)
+                }
             }
             .padding(.horizontal, 16).padding(.vertical, 14)
             .frame(maxWidth: .infinity, alignment: .leading)
