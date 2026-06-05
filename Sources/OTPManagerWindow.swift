@@ -9,6 +9,9 @@ final class OTPManagerWindow {
 
     func show() {
         if let window = window {
+            // Tạo lại nội dung mỗi lần mở để gate khóa đánh giá lại trạng thái unlock
+            // (grace period có thể đã hết → phải hỏi PIN/Touch ID lại).
+            window.contentView = NSHostingView(rootView: OTPManagerView())
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
