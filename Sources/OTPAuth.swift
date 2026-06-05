@@ -17,7 +17,22 @@ final class OTPAuth {
     /// Cấu trúc lưu trong Keychain cho PIN.
     private struct PINRecord: Codable { var salt: Data; var hash: Data }
 
-    var hasPIN: Bool { KeychainHelper.load(account: pinAccount) != nil }
+    // Cache PIN record trong RAM: chỉ chạm Keychain 1 lần lúc nạp đầu.
+    // App ad-hoc signed → mỗi lần đọc Keychain macOS có thể hỏi quyền, nên KHÔNG đọc lặp lại.
+    private var loadedRecord: PINRecord?
+    private var didLoad = false
+
+    private func currentRecord() -> PINRecord? {
+        if !didLoad {
+            didLoad = true
+            if let data = KeychainHelper.load(account: pinAccount) {
+                loadedRecord = try? JSONDecoder().decode(PINRecord.self, from: data)
+            }
+        }
+        return loadedRecord
+    }
+
+    var hasPIN: Bool { currentRecord() != nil }
 
     var isLockedOut: Bool {
         if let until = lockedUntil, until > Date() { return true }
@@ -43,6 +58,8 @@ final class OTPAuth {
         if let data = try? JSONEncoder().encode(record) {
             KeychainHelper.save(data, account: pinAccount)
         }
+        loadedRecord = record   // cập nhật cache, khỏi đọc lại Keychain
+        didLoad = true
         failureCount = 0
         lockedUntil = nil
         return true
@@ -50,9 +67,7 @@ final class OTPAuth {
 
     /// Trả true nếu PIN đúng. Sai quá nhiều lần → khóa tạm.
     func verifyPIN(_ pin: String) -> Bool {
-        guard !isLockedOut,
-              let data = KeychainHelper.load(account: pinAccount),
-              let record = try? JSONDecoder().decode(PINRecord.self, from: data) else { return false }
+        guard !isLockedOut, let record = currentRecord() else { return false }
         let candidate = Self.hash(pin: pin, salt: record.salt)
         let ok = candidate == record.hash
         if ok {
