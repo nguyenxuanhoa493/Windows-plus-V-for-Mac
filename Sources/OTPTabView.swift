@@ -104,7 +104,12 @@ struct OTPTabView: View {
     }
 
     private func addFromScreenRegion() {
+        // Ẩn popup trong lúc chọn vùng: (1) tránh popup (mức nổi) lọt vào ảnh chụp che mất QR,
+        // (2) click chọn vùng là sự kiện app khác → tránh global monitor tự đóng popup.
+        let popup = NSApp.windows.first { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("Clipboard") }
+        popup?.orderOut(nil)
         QRDecoder.captureScreenRegion { msg in
+            popup?.makeKeyAndOrderFront(nil)   // hiện lại popup, không đóng
             guard let msg = msg, let parsed = OTPItem.parse(otpauthURI: msg) else {
                 statusMessage = Localization.shared.localizedString("otp_qr_not_found"); return
             }
