@@ -16,6 +16,7 @@ struct OTPManagerView: View {
     @State private var editingItem: OTPItem?
     @State private var statusMessage = ""
     @State private var pendingAddSource: OTPAddSource?
+    @State private var didTriggerInitialSource = false
 
     var body: some View {
         Group {
@@ -61,12 +62,12 @@ struct OTPManagerView: View {
             }
         }
         .onAppear {
-            if let src = initialAddSource {
-                pendingAddSource = src
-                showingAdd = true
-            }
+            guard !didTriggerInitialSource, let src = initialAddSource else { return }
+            didTriggerInitialSource = true
+            pendingAddSource = src
+            showingAdd = true
         }
-        .sheet(isPresented: $showingAdd) {
+        .sheet(isPresented: $showingAdd, onDismiss: { pendingAddSource = nil }) {
             OTPEditSheet(item: nil, onSave: { newItem in manager.add(newItem) }, initialSource: pendingAddSource)
         }
         .sheet(item: $editingItem) { item in
@@ -207,10 +208,12 @@ struct OTPEditSheet: View {
     private func triggerInitialSourceIfNeeded() {
         guard item == nil, !didTriggerSource, let src = initialSource else { return }
         didTriggerSource = true
-        switch src {
-        case .manual: break               // chỉ hiện form nhập tay
-        case .qrImage: importQRImage()
-        case .screenRegion: captureScreen()
+        DispatchQueue.main.async {
+            switch src {
+            case .manual: break               // chỉ hiện form nhập tay
+            case .qrImage: importQRImage()
+            case .screenRegion: captureScreen()
+            }
         }
     }
 
