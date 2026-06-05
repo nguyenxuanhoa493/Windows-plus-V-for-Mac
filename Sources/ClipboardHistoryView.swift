@@ -382,6 +382,14 @@ struct ClipboardHistoryView: View {
                     Text(item.code(at: otpNow) ?? "------")
                         .font(.system(size: 16, weight: .semibold, design: .monospaced))
                         .foregroundColor(settings.themedAccent)
+                    let remaining = item.secondsRemaining(at: otpNow)
+                    ZStack {
+                        Circle().stroke(Color.secondary.opacity(0.3), lineWidth: 2)
+                        Circle().trim(from: 0, to: CGFloat(remaining) / CGFloat(max(item.period, 1)))
+                            .stroke(settings.themedAccent, lineWidth: 2)
+                            .rotationEffect(.degrees(-90))
+                        Text("\(remaining)").font(.system(size: 9))
+                    }.frame(width: 22, height: 22)
                 } else {
                     Image(systemName: "lock.fill").foregroundColor(.secondary)
                 }
