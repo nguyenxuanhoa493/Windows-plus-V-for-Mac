@@ -417,6 +417,19 @@ struct ClipboardHistoryView: View {
                 } label: {
                     Label(Localization.shared.localizedString("settings"), systemImage: "gearshape")
                 }
+                if selectedFilter == .otp {
+                    Divider()
+                    Button {
+                        OTPBackup.exportInteractive()
+                    } label: {
+                        Label(Localization.shared.localizedString("otp_export"), systemImage: "square.and.arrow.up")
+                    }
+                    Button {
+                        OTPBackup.importInteractive()
+                    } label: {
+                        Label(Localization.shared.localizedString("otp_import"), systemImage: "square.and.arrow.down")
+                    }
+                }
                 Divider()
                 Button {
                     showClearDataDialog()

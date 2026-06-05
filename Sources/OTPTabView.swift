@@ -10,7 +10,6 @@ struct OTPTabView: View {
 
     @ObservedObject private var otpManager = OTPManager.shared
     @ObservedObject private var settings = Settings.shared
-    private let auth = OTPAuth.shared
 
     @State private var unlocked = OTPManager.shared.isUnlocked
     @State private var otpNow = Date()
@@ -56,15 +55,13 @@ struct OTPTabView: View {
     private var header: some View {
         HStack(spacing: 8) {
             Menu {
-                Button(Localization.shared.localizedString("otp_add_manual")) { pendingAddSource = .manual; showingAdd = true }
-                Button(Localization.shared.localizedString("otp_add_qr_image")) { pendingAddSource = .qrImage; showingAdd = true }
-                Button(Localization.shared.localizedString("otp_add_screen")) { pendingAddSource = .screenRegion; showingAdd = true }
+                Button(Localization.shared.localizedString("otp_add_manual")) { showingAdd = true }
+                Button(Localization.shared.localizedString("otp_add_qr_image")) { addFromQRImage() }
+                Button(Localization.shared.localizedString("otp_add_screen")) { addFromScreenRegion() }
             } label: {
                 Label(Localization.shared.localizedString("otp_add"), systemImage: "plus")
             }.fixedSize()
             Spacer()
-            Button(Localization.shared.localizedString("otp_export")) { exportTapped() }
-            Button(Localization.shared.localizedString("otp_import")) { importTapped() }
         }.padding(.horizontal, 12).padding(.vertical, 6)
     }
 
@@ -95,52 +92,31 @@ struct OTPTabView: View {
         .background(RoundedRectangle(cornerRadius: 8).fill(settings.themedSurface))
     }
 
-    // MARK: - Export / Import  (chuyển từ OTPManagerView)
-    private func exportTapped() {
-        guard auth.hasPIN else { statusMessage = Localization.shared.localizedString("otp_setup_pin_title"); return }
-        let alert = NSAlert()
-        alert.messageText = Localization.shared.localizedString("otp_export")
-        alert.informativeText = Localization.shared.localizedString("otp_export_warning")
-        alert.addButton(withTitle: Localization.shared.localizedString("otp_export"))
-        alert.addButton(withTitle: Localization.shared.localizedString("otp_cancel"))
-        let input = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
-        input.placeholderString = Localization.shared.localizedString("otp_enter_pin")
-        alert.accessoryView = input
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        let pin = input.stringValue
-        guard auth.verifyPIN(pin) else { statusMessage = Localization.shared.localizedString("otp_pin_wrong"); return }
-        let panel = NSSavePanel()
-        panel.nameFieldStringValue = "clipboard-otp-backup.enc"
+    // MARK: - Thêm từ QR ảnh / vùng màn hình (thao tác trực tiếp, không mở form)
+    private func addFromQRImage() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [UTType.image]
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            let data = try otpManager.exportData(pin: pin)
-            try data.write(to: url)
-            statusMessage = "✅"
-        } catch {
-            print("DEBUG: OTP export lỗi: \(error)")
-            statusMessage = Localization.shared.localizedString("otp_export_failed")
+        guard let msg = QRDecoder.decode(fileURL: url), let parsed = OTPItem.parse(otpauthURI: msg) else {
+            statusMessage = Localization.shared.localizedString("otp_qr_not_found"); return
+        }
+        addParsed(parsed)
+    }
+
+    private func addFromScreenRegion() {
+        QRDecoder.captureScreenRegion { msg in
+            guard let msg = msg, let parsed = OTPItem.parse(otpauthURI: msg) else {
+                statusMessage = Localization.shared.localizedString("otp_qr_not_found"); return
+            }
+            addParsed(parsed)
         }
     }
 
-    private func importTapped() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [UTType.data]
-        panel.allowsMultipleSelection = false
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        let alert = NSAlert()
-        alert.messageText = Localization.shared.localizedString("otp_import")
-        alert.addButton(withTitle: Localization.shared.localizedString("otp_import"))
-        alert.addButton(withTitle: Localization.shared.localizedString("otp_cancel"))
-        let input = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
-        input.placeholderString = Localization.shared.localizedString("otp_enter_pin")
-        alert.accessoryView = input
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        do {
-            let data = try Data(contentsOf: url)
-            let added = try otpManager.importData(data, pin: input.stringValue)
-            statusMessage = String(format: Localization.shared.localizedString("otp_import_done"), added)
-        } catch {
-            statusMessage = Localization.shared.localizedString("otp_import_failed")
+    private func addParsed(_ item: OTPItem) {
+        if otpManager.add(item) {
+            statusMessage = String(format: Localization.shared.localizedString("otp_added"), item.name)
+        } else {
+            statusMessage = Localization.shared.localizedString("otp_secret_duplicate")
         }
     }
 }
