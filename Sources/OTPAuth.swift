@@ -30,12 +30,13 @@ final class OTPAuth {
     }
 
     // MARK: - PIN
-    func setPIN(_ pin: String) {
+    @discardableResult
+    func setPIN(_ pin: String) -> Bool {
         var salt = Data(count: 16)
         let rc = salt.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 16, $0.baseAddress!) }
         guard rc == errSecSuccess else {
             print("DEBUG: OTPAuth SecRandomCopyBytes lỗi \(rc) — không lưu PIN")
-            return
+            return false
         }
         let hash = Self.hash(pin: pin, salt: salt)
         let record = PINRecord(salt: salt, hash: hash)
@@ -44,6 +45,7 @@ final class OTPAuth {
         }
         failureCount = 0
         lockedUntil = nil
+        return true
     }
 
     /// Trả true nếu PIN đúng. Sai quá nhiều lần → khóa tạm.

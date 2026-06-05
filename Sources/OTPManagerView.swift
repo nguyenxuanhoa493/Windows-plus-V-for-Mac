@@ -6,11 +6,23 @@ struct OTPManagerView: View {
     @ObservedObject private var manager = OTPManager.shared
     private let auth = OTPAuth.shared
 
+    @State private var unlocked = OTPManager.shared.isUnlocked
     @State private var showingAdd = false
     @State private var editingItem: OTPItem?
     @State private var statusMessage = ""
 
     var body: some View {
+        Group {
+            if unlocked {
+                mainContent
+            } else {
+                OTPLockView(onUnlocked: { unlocked = true })
+            }
+        }
+        .frame(minWidth: 460, minHeight: 520)
+    }
+
+    private var mainContent: some View {
         VStack(spacing: 0) {
             header
             Divider()
@@ -42,7 +54,6 @@ struct OTPManagerView: View {
                 Text(statusMessage).font(.system(size: 11)).foregroundColor(.secondary).padding(6)
             }
         }
-        .frame(minWidth: 460, minHeight: 520)
         .sheet(isPresented: $showingAdd) {
             OTPEditSheet(item: nil) { newItem in manager.add(newItem) }
         }
