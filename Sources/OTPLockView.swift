@@ -12,6 +12,7 @@ struct OTPLockView: View {
     @State private var confirmPin = ""
     @State private var errorMessage = ""
     @State private var lockoutRemaining = OTPAuth.shared.lockoutRemaining
+    @State private var requestConfirmFocus = false
 
     private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -53,10 +54,11 @@ struct OTPLockView: View {
             Text(Localization.shared.localizedString("otp_setup_pin_title")).font(.system(size: 13, weight: .medium))
             Text(Localization.shared.localizedString("otp_enter_pin"))
                 .font(.system(size: 11)).foregroundColor(.secondary)
-            PINEntryView(pin: $pin)
+            PINEntryView(pin: $pin, onComplete: { requestConfirmFocus = true })
             Text(Localization.shared.localizedString("otp_setup_pin_confirm"))
                 .font(.system(size: 11)).foregroundColor(.secondary)
-            PINEntryView(pin: $confirmPin, autoFocus: false, onComplete: submitNewPIN)
+            PINEntryView(pin: $confirmPin, autoFocus: false,
+                         onComplete: submitNewPIN, focusRequest: $requestConfirmFocus)
             if !errorMessage.isEmpty {
                 Text(errorMessage).font(.system(size: 11)).foregroundColor(.red)
             }

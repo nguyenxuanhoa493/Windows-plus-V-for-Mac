@@ -7,6 +7,8 @@ struct PINEntryView: View {
     var length: Int = 6
     var autoFocus: Bool = true
     var onComplete: () -> Void = {}
+    /// Parent đặt true để yêu cầu focus ô này (vd: sau khi ô PIN đầu nhập xong).
+    var focusRequest: Binding<Bool>? = nil
 
     @ObservedObject private var settings = Settings.shared
     @FocusState private var focused: Bool
@@ -19,7 +21,7 @@ struct PINEntryView: View {
                 set: { newValue in
                     let digits = String(newValue.filter { $0.isNumber }.prefix(length))
                     pin = digits
-                    if digits.count == length { onComplete() }
+                    if digits.count == length { DispatchQueue.main.async { onComplete() } }
                 }
             ))
             .textFieldStyle(.plain)
@@ -35,6 +37,12 @@ struct PINEntryView: View {
         }
         .onAppear {
             if autoFocus { DispatchQueue.main.async { focused = true } }
+        }
+        .onChange(of: focusRequest?.wrappedValue ?? false) { req in
+            if req {
+                focused = true
+                focusRequest?.wrappedValue = false
+            }
         }
     }
 
