@@ -498,6 +498,10 @@ struct ClipboardHistoryView: View {
                 return nil
             }
 
+            // Tab OTP tự xử lý bàn phím (nhập PIN, ô tìm kiếm, sheet) — không can thiệp,
+            // nếu không gõ PIN sẽ kích hoạt nhầm tìm kiếm.
+            if selectedFilter == .otp { return event }
+
             let items = filteredItems
             let count = items.count
 
