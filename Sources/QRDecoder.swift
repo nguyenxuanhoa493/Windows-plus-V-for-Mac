@@ -46,8 +46,7 @@ enum QRDecoder {
             print("DEBUG: VNDetectBarcodesRequest lỗi: \(error)")
             return nil
         }
-        let observations = (request.results ?? []).compactMap { $0 as? VNBarcodeObservation }
-        for obs in observations {
+        for obs in (request.results ?? []) {
             if let payload = obs.payloadStringValue, !payload.isEmpty {
                 return payload
             }
