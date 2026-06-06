@@ -13,7 +13,7 @@ enum OTPStore {
     private static let dir: URL = {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
-        let d = base.appendingPathComponent("Clipboard", isDirectory: true)
+        let d = base.appendingPathComponent("CursorKit", isDirectory: true)
         try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true,
             attributes: [.posixPermissions: 0o700])
         return d
@@ -34,27 +34,41 @@ enum OTPStore {
         return newKey
     }
 
+    // Cache RAM: chỉ giải mã file 1 lần; save cập nhật cache (chỉ app này ghi file nên không lo stale).
+    private static var cache: [String: Data]?
+
     private static func loadAll() -> [String: Data] {
-        guard let blob = try? Data(contentsOf: fileURL), !blob.isEmpty else { return [:] }
+        if let cached = cache { return cached }
+        guard let blob = try? Data(contentsOf: fileURL), !blob.isEmpty else {
+            cache = [:]
+            return [:]
+        }
         do {
             let box = try AES.GCM.SealedBox(combined: blob)
             let plain = try AES.GCM.open(box, using: key())
-            return try JSONDecoder().decode([String: Data].self, from: plain)
+            let dict = try JSONDecoder().decode([String: Data].self, from: plain)
+            cache = dict
+            return dict
         } catch {
             print("DEBUG: OTPStore đọc lỗi: \(error)")
+            cache = [:]
             return [:]
         }
     }
 
-    private static func saveAll(_ dict: [String: Data]) {
+    @discardableResult
+    private static func saveAll(_ dict: [String: Data]) -> Bool {
         do {
             let plain = try JSONEncoder().encode(dict)
             let sealed = try AES.GCM.seal(plain, using: key())
-            guard let combined = sealed.combined else { return }
+            guard let combined = sealed.combined else { return false }
             try combined.write(to: fileURL, options: [.atomic])
             try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
+            cache = dict   // cập nhật cache sau khi ghi thành công
+            return true
         } catch {
             print("DEBUG: OTPStore ghi lỗi: \(error)")
+            return false
         }
     }
 
@@ -62,8 +76,7 @@ enum OTPStore {
     static func save(_ data: Data, account: String) -> Bool {
         var d = loadAll()
         d[account] = data
-        saveAll(d)
-        return true
+        return saveAll(d)
     }
 
     static func load(account: String) -> Data? {
@@ -74,7 +87,6 @@ enum OTPStore {
     static func delete(account: String) -> Bool {
         var d = loadAll()
         d[account] = nil
-        saveAll(d)
-        return true
+        return saveAll(d)
     }
 }
