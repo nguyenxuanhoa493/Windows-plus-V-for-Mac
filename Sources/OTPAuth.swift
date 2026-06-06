@@ -7,7 +7,7 @@ final class OTPAuth {
     static let shared = OTPAuth()
     private init() {}
 
-    private let pinAccount = "com.xuanhoa.clipboard.otp.pin"
+    private let pinAccount = "com.xuanhoa.cursorkit.otp.pin"
     private let maxFailures = 5
     private let lockoutSeconds: TimeInterval = 30
 

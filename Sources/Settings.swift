@@ -214,6 +214,13 @@ class Settings: ObservableObject {
         }
     }
 
+    /// Bật/tắt hiệu ứng hover/nhún/shine trong popup.
+    @Published var enableVisualEffects: Bool {
+        didSet {
+            UserDefaults.standard.set(enableVisualEffects, forKey: "enableVisualEffects")
+        }
+    }
+
     // MARK: - Feature toggles
     @Published var moveToTopAfterPaste: Bool {
         didSet { UserDefaults.standard.set(moveToTopAfterPaste, forKey: "feature_moveToTopAfterPaste") }
@@ -267,6 +274,21 @@ class Settings: ObservableObject {
     /// Thời gian giữ mở khóa OTP (phút) trước khi hỏi lại PIN/Touch ID.
     @Published var otpGracePeriodMinutes: Int {
         didSet { UserDefaults.standard.set(otpGracePeriodMinutes, forKey: "otpGracePeriodMinutes") }
+    }
+
+    /// Bật/tắt backup OTP tự động.
+    @Published var otpAutoBackupEnabled: Bool {
+        didSet { UserDefaults.standard.set(otpAutoBackupEnabled, forKey: "otpAutoBackupEnabled") }
+    }
+
+    /// Folder ghi backup OTP tự động.
+    @Published var otpAutoBackupDirectory: String {
+        didSet { UserDefaults.standard.set(otpAutoBackupDirectory, forKey: "otpAutoBackupDirectory") }
+    }
+
+    /// Chu kỳ backup OTP tự động, tính bằng giờ.
+    @Published var otpAutoBackupIntervalHours: Int {
+        didSet { UserDefaults.standard.set(otpAutoBackupIntervalHours, forKey: "otpAutoBackupIntervalHours") }
     }
 
     func applyTheme() {
@@ -400,6 +422,7 @@ class Settings: ObservableObject {
             if UserDefaults.standard.object(forKey: key) == nil { return defaultValue }
             return UserDefaults.standard.bool(forKey: key)
         }
+        self.enableVisualEffects = loadBool("enableVisualEffects", default: true)
         self.moveToTopAfterPaste = loadBool("feature_moveToTopAfterPaste", default: true)
         self.enableJSONToTable = loadBool("feature_enableJSONToTable", default: true)
         self.enableJSONToExcel = loadBool("feature_enableJSONToExcel", default: true)
@@ -413,7 +436,23 @@ class Settings: ObservableObject {
         self.showItemInfoLine = loadBool("feature_showItemInfoLine", default: true)
         self.enableOTP = loadBool("feature_enableOTP", default: true)
         let savedGrace = UserDefaults.standard.integer(forKey: "otpGracePeriodMinutes")
-        self.otpGracePeriodMinutes = [1, 5, 15].contains(savedGrace) ? savedGrace : 5
+        self.otpGracePeriodMinutes = (1...1440).contains(savedGrace) ? savedGrace : 30
+        self.otpAutoBackupEnabled = loadBool("otpAutoBackupEnabled", default: true)
+
+        if let savedBackupPath = UserDefaults.standard.string(forKey: "otpAutoBackupDirectory"),
+           !savedBackupPath.isEmpty {
+            self.otpAutoBackupDirectory = savedBackupPath
+        } else {
+            let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+                ?? FileManager.default.temporaryDirectory
+            self.otpAutoBackupDirectory = base
+                .appendingPathComponent("CursorKit", isDirectory: true)
+                .appendingPathComponent("OTP Backups", isDirectory: true)
+                .path
+        }
+
+        let savedBackupInterval = UserDefaults.standard.integer(forKey: "otpAutoBackupIntervalHours")
+        self.otpAutoBackupIntervalHours = (1...720).contains(savedBackupInterval) ? savedBackupInterval : 24
     }
     
     func requestAccessibilityPermission() {

@@ -81,3 +81,5 @@ Clipboard.app/
 *.zip
 .mcp.json
 .codegraph/
+CursorKit.app/
+icon.iconset/

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-A macOS menu-bar clipboard history manager ("Windows + V For Mac"), written in Swift / SwiftUI / AppKit, distributed as an unsigned `.app` bundle via GitHub releases. Bundle id: `com.xuanhoa.clipboard`. Minimum macOS 12.
+A macOS menu-bar clipboard history manager ("Windows + V For Mac"), written in Swift / SwiftUI / AppKit, distributed as an unsigned `.app` bundle via GitHub releases. Bundle id: `com.xuanhoa.cursorkit`. Minimum macOS 12.
 
 Two third-party SwiftPM deps (see `Package.swift`):
 - `HotKey` — global hotkey (default `⌃V`)
@@ -20,10 +20,10 @@ The README (in Vietnamese) is the user-facing doc; comments and `print("DEBUG: �
 |---|---|
 | Dev run (no bundle, no signing, no permissions reset) | `./run_debug.sh` |
 | Clean rebuild + run debug binary | `./run.sh` |
-| Fast iterate on an already-built `Clipboard.app` (binary swap, **does not re-sign**) | `./build_fast.sh` |
+| Fast iterate on an already-built `CursorKit.app` (binary swap, **does not re-sign**) | `./build_fast.sh` |
 | Full Universal app bundle (arm64 + x86_64, ad-hoc signed) | `./create_app.sh` |
-| Bundle + zip for GitHub release asset (`Clipboard-binary.zip`) | `./build_release.sh` |
-| Build DMG installer (`Clipboard-${VERSION}.dmg`) | `./build_dmg.sh` |
+| Bundle + zip for GitHub release asset (`CursorKit-binary.zip`) | `./build_release.sh` |
+| Build DMG installer (`CursorKit-${VERSION}.dmg`) | `./build_dmg.sh` |
 | Single-arch swift build | `swift build` / `swift build -c release --arch arm64` |
 
 There is **no test target** — `swift test` will do nothing useful.

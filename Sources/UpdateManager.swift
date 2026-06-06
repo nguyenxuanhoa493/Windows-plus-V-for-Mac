@@ -81,12 +81,12 @@ class UpdateManager: ObservableObject {
                 self?.latestVersion = version
                 self?.releaseNotes = json["body"] as? String
                 
-                // Find binary asset (look for Clipboard-binary.zip or Clipboard.zip)
+                // Find binary asset (look for CursorKit-binary.zip or CursorKit.zip)
                 if let assets = json["assets"] as? [[String: Any]] {
                     for asset in assets {
                         if let name = asset["name"] as? String,
                            let downloadURL = asset["browser_download_url"] as? String {
-                            if name == "Clipboard-binary.zip" || name == "Clipboard.zip" {
+                            if name == "CursorKit-binary.zip" || name == "CursorKit.zip" {
                                 self?.releaseDownloadURL = URL(string: downloadURL)
                                 break
                             }
@@ -234,7 +234,7 @@ class UpdateManager: ObservableObject {
 
     private func installUpdate(from zipURL: URL) {
         let fileManager = FileManager.default
-        let tempDir = fileManager.temporaryDirectory.appendingPathComponent("ClipboardUpdate-\(UUID().uuidString)")
+        let tempDir = fileManager.temporaryDirectory.appendingPathComponent("CursorKitUpdate-\(UUID().uuidString)")
         
         do {
             try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
@@ -249,9 +249,9 @@ class UpdateManager: ObservableObject {
             try unzipProcess.run()
             unzipProcess.waitUntilExit()
             
-            // Tìm Clipboard.app trong package giải nén
+            // Tìm CursorKit.app trong package giải nén
             var newAppBundlePath: URL?
-            let directApp = tempDir.appendingPathComponent("Clipboard.app")
+            let directApp = tempDir.appendingPathComponent("CursorKit.app")
             if fileManager.fileExists(atPath: directApp.path) {
                 newAppBundlePath = directApp
             }
@@ -260,7 +260,7 @@ class UpdateManager: ObservableObject {
             if newAppBundlePath == nil {
                 if let enumerator = fileManager.enumerator(at: tempDir, includingPropertiesForKeys: [.isDirectoryKey]) {
                     while let fileURL = enumerator.nextObject() as? URL {
-                        if fileURL.lastPathComponent == "Clipboard.app" {
+                        if fileURL.lastPathComponent == "CursorKit.app" {
                             newAppBundlePath = fileURL
                             break
                         }
@@ -269,7 +269,7 @@ class UpdateManager: ObservableObject {
             }
             
             guard let appBundlePath = newAppBundlePath else {
-                updateError = "Clipboard.app not found in update package"
+                updateError = "CursorKit.app not found in update package"
                 try? fileManager.removeItem(at: tempDir)
                 return
             }
@@ -278,7 +278,7 @@ class UpdateManager: ObservableObject {
 
             // Replace TOÀN BỘ .app bundle (không swap từng file con).
             // Bundle mới đã được create_app.sh ad-hoc sign với entitlements →
-            // cùng BundleIdentifier (com.xuanhoa.clipboard) + cùng path →
+            // cùng BundleIdentifier (com.xuanhoa.cursorkit) + cùng path →
             // TCC giữ nguyên quyền Accessibility.
             // Tuyệt đối KHÔNG xoá _CodeSignature: unsigned app TCC dùng CDHash,
             // CDHash đổi mỗi build → mất quyền.

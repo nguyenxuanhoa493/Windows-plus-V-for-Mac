@@ -52,6 +52,7 @@ struct SettingsView: View {
     
     @State private var useNativeUI: Bool
     @State private var selectedTab: Int = 0
+    @State private var customBackupPassword: String = ""
 
     init() {
         _maxHistoryText = State(initialValue: String(Settings.shared.maxHistoryItems))
@@ -67,7 +68,8 @@ struct SettingsView: View {
                 sidebarItem(tag: 0, icon: "gearshape", titleKey: "tab_general")
                 sidebarItem(tag: 1, icon: "paintpalette", titleKey: "tab_appearance")
                 sidebarItem(tag: 2, icon: "switch.2", titleKey: "tab_features")
-                sidebarItem(tag: 3, icon: "info.circle", titleKey: "tab_info")
+                sidebarItem(tag: 3, icon: "lock.shield", titleKey: "otp_tab")
+                sidebarItem(tag: 4, icon: "info.circle", titleKey: "tab_info")
                 Spacer()
             }
             .padding(.vertical, 12)
@@ -83,7 +85,8 @@ struct SettingsView: View {
                 case 0: generalTab
                 case 1: appearanceTab
                 case 2: featuresTab
-                case 3: infoTab
+                case 3: otpSettingsTab
+                case 4: infoTab
                 default: generalTab
                 }
             }
@@ -399,6 +402,27 @@ struct SettingsView: View {
                     }
                 }
 
+                settingsCard {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Label(localization.localizedString("visual_effects"), systemImage: "sparkles")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.secondary)
+                            Text(localization.localizedString("visual_effects_hint"))
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary.opacity(0.8))
+                        }
+                        Spacer()
+                        Toggle("", isOn: Binding(
+                            get: { settings.enableVisualEffects },
+                            set: { settings.enableVisualEffects = $0 }
+                        ))
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                        .labelsHidden()
+                    }
+                }
+
                 // Vị trí popup so với con trỏ — lưới 3x3 + live preview
                 settingsCard {
                     VStack(alignment: .leading, spacing: 8) {
@@ -612,7 +636,7 @@ struct SettingsView: View {
         }
     }
 
-    /// Load resource từ cả 2 bundle: SwiftPM module bundle (dev build) + main app bundle (release Clipboard.app).
+    /// Load resource từ cả 2 bundle: SwiftPM module bundle (dev build) + main app bundle (release CursorKit.app).
     static func loadResourceImage(named name: String, ext: String) -> NSImage? {
         if let url = Bundle.module.url(forResource: name, withExtension: ext),
            let img = NSImage(contentsOf: url) {
@@ -755,6 +779,14 @@ struct SettingsView: View {
                         set: { settings.hidePopupAfterDrag = $0 }
                     )
                 )
+            }
+            .padding(16)
+        }
+    }
+
+    private var otpSettingsTab: some View {
+        ScrollView {
+            VStack(spacing: 12) {
                 featureToggleRow(
                     icon: "lock.shield",
                     titleKey: "otp_feature_enable",
@@ -762,6 +794,118 @@ struct SettingsView: View {
                         get: { settings.enableOTP },
                         set: { settings.enableOTP = $0 }
                     )
+                )
+
+                featureToggleRow(
+                    icon: "externaldrive.badge.timemachine",
+                    titleKey: "otp_auto_backup_enable",
+                    isOn: Binding(
+                        get: { settings.otpAutoBackupEnabled },
+                        set: { settings.otpAutoBackupEnabled = $0 }
+                    )
+                )
+
+                settingsCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label(localization.localizedString("otp_auto_backup_path"), systemImage: "folder")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.secondary)
+
+                        HStack(spacing: 8) {
+                            Text(settings.otpAutoBackupDirectory)
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 5)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(Color(NSColor.textBackgroundColor).opacity(0.5))
+                                )
+
+                            Button(localization.localizedString("choose")) {
+                                chooseOTPBackupDirectory()
+                            }
+                            .controlSize(.small)
+                        }
+                    }
+                }
+
+                settingsCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label(localization.localizedString("otp_auto_backup_interval"), systemImage: "clock.arrow.2.circlepath")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.secondary)
+
+                        Stepper(value: Binding(
+                            get: { settings.otpAutoBackupIntervalHours },
+                            set: { settings.otpAutoBackupIntervalHours = min(max($0, 1), 720) }
+                        ), in: 1...720, step: 1) {
+                            Text(String(format: localization.localizedString("otp_hours_value"), settings.otpAutoBackupIntervalHours))
+                                .font(.system(size: 12, design: .monospaced))
+                        }
+                    }
+                }
+
+                settingsCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label(localization.localizedString("otp_auto_lock_time"), systemImage: "lock.clock")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.secondary)
+
+                        Stepper(value: Binding(
+                            get: { settings.otpGracePeriodMinutes },
+                            set: { settings.otpGracePeriodMinutes = min(max($0, 1), 1440) }
+                        ), in: 1...1440, step: 5) {
+                            Text(String(format: localization.localizedString("otp_minutes_value"), settings.otpGracePeriodMinutes))
+                                .font(.system(size: 12, design: .monospaced))
+                        }
+                    }
+                }
+
+                settingsCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label(localization.localizedString("otp_backup_password_default"), systemImage: "key")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.secondary)
+
+                        HStack(spacing: 8) {
+                            SecureField(localization.localizedString("otp_backup_custom_password_placeholder"),
+                                        text: $customBackupPassword)
+                                .textFieldStyle(.roundedBorder)
+
+                            Button(localization.localizedString("otp_save")) {
+                                OTPBackup.setCustomPassphrase(customBackupPassword)
+                                customBackupPassword = ""
+                                OTPBackup.performAutoBackupIfNeeded(force: true)
+                            }
+                            .controlSize(.small)
+                            .disabled(customBackupPassword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        }
+
+                        Text(OTPBackup.hasCustomPassphrase
+                             ? localization.localizedString("otp_backup_custom_password_set")
+                             : localization.localizedString("otp_backup_custom_password_not_set"))
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "info.circle")
+                        .foregroundColor(settings.themedAccent)
+                    Text(localization.localizedString("otp_auto_backup_hint"))
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(settings.themedAccent.opacity(0.08))
                 )
             }
             .padding(16)
@@ -780,6 +924,18 @@ struct SettingsView: View {
                     .controlSize(.small)
                     .labelsHidden()
             }
+        }
+    }
+
+    private func chooseOTPBackupDirectory() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.directoryURL = URL(fileURLWithPath: settings.otpAutoBackupDirectory, isDirectory: true)
+        if panel.runModal() == .OK, let url = panel.url {
+            settings.otpAutoBackupDirectory = url.path
         }
     }
 

@@ -196,8 +196,8 @@ struct ClipboardHistoryView: View {
                         inactiveForeground: settings.isCustomThemeActive ? settings.themedForeground.opacity(0.7) : filter.color
                     ) {
                         selectedFilter = filter
-                        if let window = NSApp.windows.first(where: { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("Clipboard") }) {
-                            window.title = filter == .all ? "Clipboard" : "Clipboard - \(filter.displayName)"
+                        if let window = NSApp.windows.first(where: { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("CursorKit") }) {
+                            window.title = filter == .all ? "CursorKit" : "CursorKit - \(filter.displayName)"
                         }
                     }
                     .tooltip(filter.displayName)
@@ -211,7 +211,7 @@ struct ClipboardHistoryView: View {
                     .gesture(
                         DragGesture(minimumDistance: 2)
                             .onChanged { value in
-                                guard let window = NSApp.windows.first(where: { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("Clipboard") }) else {
+                                guard let window = NSApp.windows.first(where: { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("CursorKit") }) else {
                                     return
                                 }
                                 let currentLocation = NSEvent.mouseLocation
@@ -514,7 +514,7 @@ struct ClipboardHistoryView: View {
         keyboardMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             // ESC luôn đóng popup
             if event.keyCode == 53 {
-                if let window = NSApp.windows.first(where: { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("Clipboard") }) {
+                if let window = NSApp.windows.first(where: { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("CursorKit") }) {
                     window.close()
                 }
                 return nil
@@ -659,15 +659,24 @@ struct PillIconButton: View {
     var fontWeight: Font.Weight = .regular
     let action: () -> Void
     @State private var isHovered = false
+    @ObservedObject private var settings = Settings.shared
 
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: fontSize, weight: fontWeight))
                 .frame(width: size.width, height: size.height)
-                .background(currentBackground)
-                .foregroundColor(isActive ? activeForeground : inactiveForeground)
-                .cornerRadius(cornerRadius)
+                .background(
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(currentBackground)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .strokeBorder(currentStroke, lineWidth: isActive ? 1.2 : 0.5)
+                )
+                .foregroundColor(currentForeground)
+                .shadow(color: activeBackground.opacity(settings.enableVisualEffects && isActive ? 0.22 : 0),
+                        radius: settings.enableVisualEffects && isActive ? 4 : 0, y: 1)
         }
         .buttonStyle(PlainButtonStyle())
         .onHover { hovering in
@@ -682,8 +691,19 @@ struct PillIconButton: View {
 
     private var currentBackground: Color {
         if isActive { return activeBackground }
-        if isHovered { return activeBackground.opacity(0.18) }
-        return inactiveBackground
+        if isHovered { return activeBackground.opacity(0.14) }
+        return inactiveBackground.opacity(0.55)
+    }
+
+    private var currentForeground: Color {
+        if isActive { return activeForeground }
+        return inactiveForeground.opacity(isHovered ? 0.88 : 0.58)
+    }
+
+    private var currentStroke: Color {
+        if isActive { return activeBackground.opacity(0.85) }
+        if isHovered { return activeBackground.opacity(0.24) }
+        return Color(NSColor.separatorColor).opacity(0.35)
     }
 }
 
@@ -830,7 +850,7 @@ struct ClipboardItemView: View {
     /// Tên file dựa hash của fileName để dedup → 2 lần drag cùng ảnh không tạo 2 file trùng.
     static func exportImageToTempFile(_ item: ClipboardItem) -> URL? {
         guard item.type == .image, let imageData = item.imageData else { return nil }
-        let fileName = "Clipboard_\(item.timeString.replacingOccurrences(of: ":", with: "-")).png"
+        let fileName = "CursorKit_\(item.timeString.replacingOccurrences(of: ":", with: "-")).png"
         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
         if FileManager.default.fileExists(atPath: tempURL.path) {
             return tempURL  // reuse
@@ -873,7 +893,7 @@ struct ClipboardItemView: View {
     let onDeleteItem: ((ClipboardItem) -> Void)?
     let onToggleBookmark: ((ClipboardItem) -> Void)?
     @State private var isHovered = false
-    @State private var borderAngle: Double = 0   // góc xoay viền gradient khi hover
+    @State private var shine: CGFloat = -1
     @State private var showAsDateTime = false
     @State private var showAsTable = false
     @State private var showAsJSON = false
@@ -1075,7 +1095,7 @@ struct ClipboardItemView: View {
                     if item.type == .file, let fileURL = item.fileURL {
                         ActionIconButton(systemImage: "arrow.up.forward.square", background: .green) {
                             NSWorkspace.shared.open(URL(fileURLWithPath: fileURL))
-                            if let window = NSApp.windows.first(where: { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("Clipboard") }) {
+                            if let window = NSApp.windows.first(where: { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("CursorKit") }) {
                                 window.close()
                             }
                         }
@@ -1083,7 +1103,7 @@ struct ClipboardItemView: View {
                     } else if item.type == .text, let text = item.text, isURL(text), let url = getURL(), Settings.shared.enableOpenURLInBrowser {
                         ActionIconButton(systemImage: "arrow.up.forward.square", background: .green) {
                             NSWorkspace.shared.open(url)
-                            if let window = NSApp.windows.first(where: { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("Clipboard") }) {
+                            if let window = NSApp.windows.first(where: { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("CursorKit") }) {
                                 window.close()
                             }
                         }
@@ -1151,6 +1171,7 @@ struct ClipboardItemView: View {
         }
         .background(rowBackground)
         .cornerRadius(isNativeStyle ? 0 : 8)
+        .overlay(rowShineOverlay)
         .overlay(rowOverlay)
         .contentShape(Rectangle())
         .contextMenu {
@@ -1182,7 +1203,7 @@ struct ClipboardItemView: View {
                 Button(action: {
                     NSWorkspace.shared.open(URL(fileURLWithPath: fileURL))
                     // Đóng window
-                    if let window = NSApp.windows.first(where: { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("Clipboard") }) {
+                    if let window = NSApp.windows.first(where: { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("CursorKit") }) {
                         window.close()
                     }
                 }) {
@@ -1195,7 +1216,7 @@ struct ClipboardItemView: View {
                 Button(action: {
                     NSWorkspace.shared.open(url)
                     // Đóng window
-                    if let window = NSApp.windows.first(where: { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("Clipboard") }) {
+                    if let window = NSApp.windows.first(where: { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("CursorKit") }) {
                         window.close()
                     }
                 }) {
@@ -1320,7 +1341,7 @@ struct ClipboardItemView: View {
             // Auto-hide popup khi user bắt đầu drag (nếu toggle bật)
             if Settings.shared.hidePopupAfterDrag {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    if let window = NSApp.windows.first(where: { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("Clipboard") }) {
+                    if let window = NSApp.windows.first(where: { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("CursorKit") }) {
                         window.close()
                     }
                 }
@@ -1331,14 +1352,25 @@ struct ClipboardItemView: View {
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovered = hovering
             }
-            // Viền gradient xoay liên tục khi hover (dừng khi rời chuột).
-            if hovering {
-                borderAngle = 0
-                withAnimation(.linear(duration: 2.5).repeatForever(autoreverses: false)) {
-                    borderAngle = 360
+            if settings.enableVisualEffects {
+                if hovering {
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) { shine = -1 }
+                    DispatchQueue.main.async {
+                        withAnimation(.easeInOut(duration: 0.75)) {
+                            shine = 1
+                        }
+                    }
+                } else {
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) { shine = -1 }
                 }
             } else {
-                withAnimation(.linear(duration: 0.2)) { borderAngle = 0 }
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) { shine = -1 }
             }
             if hovering {
                 NSCursor.pointingHand.push()
@@ -1350,13 +1382,13 @@ struct ClipboardItemView: View {
             // If item has been converted (JSON→Table, Excel→JSON, or Timestamp→DateTime), paste and close
             if showAsTable || showAsJSON || showAsDateTime {
                 item.paste(displayText: displayText)
-                if let window = NSApp.windows.first(where: { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("Clipboard") }) {
+                if let window = NSApp.windows.first(where: { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("CursorKit") }) {
                     window.close()
                 }
             } else if item.type == .text && displayText != item.text {
                 // Fallback: if displayText is different, paste it
                 item.paste(displayText: displayText)
-                if let window = NSApp.windows.first(where: { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("Clipboard") }) {
+                if let window = NSApp.windows.first(where: { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("CursorKit") }) {
                     window.close()
                 }
             } else {
@@ -1398,22 +1430,33 @@ struct ClipboardItemView: View {
         }
     }
 
-    /// Viền: hover → gradient góc xoay (chuyển động); chọn → accent; mặc định → xám.
+    /// Viền tĩnh: hover/chọn → accent; mặc định → xám. Hiệu ứng hover nằm ở vệt gương.
     private var borderStyle: AnyShapeStyle {
         if isHovered {
-            return AnyShapeStyle(AngularGradient(
-                gradient: Gradient(colors: [
-                    settings.themedAccent.opacity(0.0),
-                    settings.themedAccent,
-                    settings.themedAccent.opacity(0.0),
-                    settings.themedAccent.opacity(0.0)
-                ]),
-                center: .center,
-                angle: .degrees(borderAngle)
-            ))
+            return AnyShapeStyle(settings.themedAccent.opacity(0.45))
         }
         if isSelected { return AnyShapeStyle(settings.themedAccent) }
         return AnyShapeStyle(Color.gray.opacity(0.3))
+    }
+
+    /// Vệt sáng gương giống OTP row, quét một lần mỗi lần hover.
+    private var rowShineOverlay: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            RoundedRectangle(cornerRadius: 4)
+                .fill(LinearGradient(
+                    colors: [.clear, .white.opacity(0.36), .clear],
+                    startPoint: .top,
+                    endPoint: .bottom
+                ))
+                .frame(width: w * 0.30)
+                .rotationEffect(.degrees(22))
+                .offset(x: shine * w * 1.2)
+                .blendMode(.plusLighter)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: isNativeStyle ? 0 : 8, style: .continuous))
+        .opacity(settings.enableVisualEffects && isHovered ? 1 : 0)
+        .allowsHitTesting(false)
     }
 
     private func updateDisplayText() {
@@ -1578,7 +1621,7 @@ struct ClipboardItemView: View {
     private func openImageInPreview() {
         guard let url = ClipboardItemView.exportImageToTempFile(item) else { return }
         NSWorkspace.shared.open(url)
-        if let window = NSApp.windows.first(where: { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("Clipboard") }) {
+        if let window = NSApp.windows.first(where: { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("CursorKit") }) {
             window.close()
         }
     }
@@ -1588,7 +1631,7 @@ struct ClipboardItemView: View {
         
         let savePanel = NSSavePanel()
         savePanel.allowedContentTypes = [.png]
-        savePanel.nameFieldStringValue = "Clipboard_\(item.timeString.replacingOccurrences(of: ":", with: "-")).png"
+        savePanel.nameFieldStringValue = "CursorKit_\(item.timeString.replacingOccurrences(of: ":", with: "-")).png"
         savePanel.level = .floating
         
         if savePanel.runModal() == .OK, let url = savePanel.url {
@@ -1728,7 +1771,7 @@ struct ClipboardItemView: View {
     
     private func pasteExcelAsImage() {
         // Đóng popup ngay để app trước được focus
-        if let window = NSApp.windows.first(where: { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("Clipboard") }) {
+        if let window = NSApp.windows.first(where: { $0.isVisible && ($0 is NSPanel) && $0.title.hasPrefix("CursorKit") }) {
             window.close()
         }
         // Render image off-main (drawing có thể nặng với bảng lớn)

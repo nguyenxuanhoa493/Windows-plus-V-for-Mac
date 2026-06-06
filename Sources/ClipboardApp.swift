@@ -65,6 +65,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Khởi tạo clipboard manager
         clipboardManager.startMonitoring()
+
+        // Khởi tạo backup OTP tự động.
+        OTPBackup.startAutoBackupMonitoring()
         
         // Tạo menu trên thanh trạng thái
         setupStatusItem()
@@ -126,8 +129,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // SF Symbol "clipboard" chỉ có từ macOS 13 → trên macOS 12 trả về nil khiến
             // icon menu bar biến mất. Fallback "doc.on.clipboard" (có từ macOS 10.15),
             // cuối cùng dùng ký tự text để luôn hiển thị được icon.
-            if let image = NSImage(systemSymbolName: "clipboard", accessibilityDescription: "Clipboard")
-                ?? NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "Clipboard") {
+            if let image = NSImage(systemSymbolName: "cursorarrow.click.2", accessibilityDescription: "CursorKit")
+                ?? NSImage(systemSymbolName: "cursorarrow", accessibilityDescription: "CursorKit")
+                ?? NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "CursorKit") {
                 button.image = image
             } else {
                 button.title = "📋"
@@ -188,7 +192,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// (CDHash đổi → signature requirement không match → toggle UI ON nhưng kernel reject).
     /// Sau reset, user cấp lại quyền sẽ tạo entry mới với CDHash hiện tại.
     private func resetAccessibilityTCC() {
-        let bundleId = Bundle.main.bundleIdentifier ?? "com.xuanhoa.clipboard"
+        let bundleId = Bundle.main.bundleIdentifier ?? "com.xuanhoa.cursorkit"
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
         process.arguments = ["reset", "Accessibility", bundleId]
@@ -421,7 +425,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             backing: .buffered,
             defer: false
         )
-        panel.title = "Clipboard"
+        panel.title = "CursorKit"
         panel.isFloatingPanel = true
         panel.level = .popUpMenu
         panel.hidesOnDeactivate = false

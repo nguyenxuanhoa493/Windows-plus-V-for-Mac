@@ -10,7 +10,7 @@ extension Notification.Name {
 final class OTPManager: ObservableObject {
     static let shared = OTPManager()
 
-    private let listAccount = "com.xuanhoa.clipboard.otp"
+    private let listAccount = "com.xuanhoa.cursorkit.otp"
     @Published private(set) var items: [OTPItem] = []
     private var unlockedUntil: Date?
 
@@ -100,11 +100,13 @@ final class OTPManager: ObservableObject {
     }
 
     func markUnlocked() {
-        // Mở khóa cho tới khi thoát app (xác nhận 1 lần mỗi lần mở app).
-        unlockedUntil = .distantFuture
+        let minutes = max(1, Settings.shared.otpGracePeriodMinutes)
+        unlockedUntil = Date().addingTimeInterval(TimeInterval(minutes * 60))
     }
 
-    func lock() { unlockedUntil = nil }
+    func lock() {
+        unlockedUntil = nil
+    }
 
     // MARK: - Export / Import (dùng PIN làm passphrase)
     func exportData(pin: String) throws -> Data {

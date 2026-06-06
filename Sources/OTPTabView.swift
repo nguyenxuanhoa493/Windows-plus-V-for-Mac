@@ -41,14 +41,14 @@ struct OTPTabView: View {
                     Spacer()
                 }.frame(maxWidth: .infinity).padding()
             } else {
-                LazyVStack(spacing: 10) {
+                LazyVStack(spacing: 8) {
                     ForEach(list) { item in
                         OTPRowView(item: item, now: otpNow,
                                    onPaste: { onPasteCode($0) },
                                    onEdit: { editingItem = item },
                                    onDelete: { otpManager.delete(item) })
                     }
-                }.padding(.horizontal, 12).padding(.vertical, 6)
+                }.padding(.horizontal, 10).padding(.vertical, 4)
             }
             if !statusMessage.isEmpty {
                 Text(statusMessage).font(.system(size: 12)).foregroundStyle(.secondary)
@@ -262,19 +262,20 @@ struct OTPRowView: View {
     var body: some View {
         let code = item.code(at: now) ?? "------"
         let remaining = item.secondsRemaining(at: now)
+        let effectsEnabled = settings.enableVisualEffects
         return Button(action: { onPaste(code) }) {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 7) {
                 // Hàng 1: tên + issuer
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(item.name).font(.system(size: 15, weight: .semibold))
+                    Text(item.name).font(.system(size: 14, weight: .semibold))
                         .foregroundColor(settings.themedForeground)
                     if let iss = item.issuer, !iss.isEmpty {
-                        Text(iss).font(.system(size: 11)).foregroundStyle(.secondary)
+                        Text(iss).font(.system(size: 10)).foregroundStyle(.secondary)
                     }
                 }
                 // Hàng 2: mã OTP + đếm ngược
-                HStack(spacing: 12) {
-                    Text(code).font(.system(size: 30, weight: .bold, design: .rounded))
+                HStack(spacing: 10) {
+                    Text(code).font(.system(size: 26, weight: .bold, design: .rounded))
                         .monospacedDigit().foregroundColor(settings.themedAccent)
                     Spacer()
                     ZStack {
@@ -282,29 +283,36 @@ struct OTPRowView: View {
                         Circle().trim(from: 0, to: CGFloat(remaining)/CGFloat(max(item.period, 1)))
                             .stroke(settings.themedAccent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                             .rotationEffect(.degrees(-90))
-                        Text("\(remaining)").font(.system(size: 12, weight: .medium)).monospacedDigit()
-                    }.frame(width: 34, height: 34)
+                        Text("\(remaining)").font(.system(size: 11, weight: .medium)).monospacedDigit()
+                    }.frame(width: 30, height: 30)
                 }
             }
-            .padding(.horizontal, 16).padding(.vertical, 14)
+            .padding(.horizontal, 14).padding(.vertical, 11)
             .frame(maxWidth: .infinity, alignment: .leading)
             .liquidGlass(cornerRadius: 18)
             .overlay(shineOverlay)
             .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .strokeBorder(settings.themedAccent.opacity(hovered ? 0.45 : 0.15), lineWidth: 1))
-            .scaleEffect(hovered ? 1.015 : 1.0)
-            .shadow(color: settings.themedAccent.opacity(hovered ? 0.22 : 0), radius: hovered ? 8 : 0, y: 2)
+            .scaleEffect(effectsEnabled && hovered ? 1.015 : 1.0)
+            .shadow(color: settings.themedAccent.opacity(effectsEnabled && hovered ? 0.22 : 0),
+                    radius: effectsEnabled && hovered ? 8 : 0, y: 2)
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
-        .buttonStyle(PressDownButtonStyle())
+        .frame(maxWidth: .infinity)
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .buttonStyle(PressDownButtonStyle(effectsEnabled: effectsEnabled))
         .onHover { h in
             withAnimation(.easeOut(duration: 0.18)) { hovered = h }
-            if h {
+            if effectsEnabled && h {
                 // Reset không animation ở tick này, rồi quét ở tick sau → lặp lại mỗi lần hover.
                 var t = Transaction(); t.disablesAnimations = true
                 withTransaction(t) { shine = -1 }
                 DispatchQueue.main.async {
                     withAnimation(.easeInOut(duration: 0.75)) { shine = 1 }
                 }
+            } else if !effectsEnabled {
+                var t = Transaction(); t.disablesAnimations = true
+                withTransaction(t) { shine = -1 }
             }
         }
         .contextMenu {
@@ -330,7 +338,7 @@ struct OTPRowView: View {
                 .blendMode(.plusLighter)
         }
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .opacity(hovered ? 1 : 0)
+        .opacity(settings.enableVisualEffects && hovered ? 1 : 0)
         .allowsHitTesting(false)
     }
 }
