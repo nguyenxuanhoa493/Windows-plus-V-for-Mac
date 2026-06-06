@@ -62,11 +62,14 @@ struct OTPItem: Codable, Identifiable, Equatable {
     }
 
     // MARK: - Base32 (RFC 4648, không padding, in hoa)
-    static func base32Decode(_ string: String) -> Data? {
-        let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
-        var lookup = [Character: UInt8]()
-        for (i, c) in alphabet.enumerated() { lookup[c] = UInt8(i) }
+    /// Bảng tra tĩnh — dựng 1 lần, tránh tạo lại dict mỗi lần decode (code() gọi mỗi giây/mỗi item).
+    private static let base32Lookup: [Character: UInt8] = {
+        var m = [Character: UInt8]()
+        for (i, c) in "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567".enumerated() { m[c] = UInt8(i) }
+        return m
+    }()
 
+    static func base32Decode(_ string: String) -> Data? {
         let cleaned = string.uppercased()
             .replacingOccurrences(of: " ", with: "")
             .replacingOccurrences(of: "=", with: "")
@@ -76,7 +79,7 @@ struct OTPItem: Codable, Identifiable, Equatable {
         var value = 0
         var output = [UInt8]()
         for c in cleaned {
-            guard let v = lookup[c] else { return nil }
+            guard let v = base32Lookup[c] else { return nil }
             value = (value << 5) | Int(v)
             bits += 5
             if bits >= 8 {
