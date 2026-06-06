@@ -52,6 +52,7 @@ struct SettingsView: View {
     
     @State private var useNativeUI: Bool
     @State private var selectedTab: Int = 0
+    @State private var customBackupPassword: String = ""
 
     init() {
         _maxHistoryText = State(initialValue: String(Settings.shared.maxHistoryItems))
@@ -67,7 +68,8 @@ struct SettingsView: View {
                 sidebarItem(tag: 0, icon: "gearshape", titleKey: "tab_general")
                 sidebarItem(tag: 1, icon: "paintpalette", titleKey: "tab_appearance")
                 sidebarItem(tag: 2, icon: "switch.2", titleKey: "tab_features")
-                sidebarItem(tag: 3, icon: "info.circle", titleKey: "tab_info")
+                sidebarItem(tag: 3, icon: "lock.shield", titleKey: "otp_tab")
+                sidebarItem(tag: 4, icon: "info.circle", titleKey: "tab_info")
                 Spacer()
             }
             .padding(.vertical, 12)
@@ -83,7 +85,8 @@ struct SettingsView: View {
                 case 0: generalTab
                 case 1: appearanceTab
                 case 2: featuresTab
-                case 3: infoTab
+                case 3: otpSettingsTab
+                case 4: infoTab
                 default: generalTab
                 }
             }
@@ -398,8 +401,134 @@ struct SettingsView: View {
                             }
                     }
                 }
+
+                settingsCard {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Label(localization.localizedString("visual_effects"), systemImage: "sparkles")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.secondary)
+                            Text(localization.localizedString("visual_effects_hint"))
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary.opacity(0.8))
+                        }
+                        Spacer()
+                        Toggle("", isOn: Binding(
+                            get: { settings.enableVisualEffects },
+                            set: { settings.enableVisualEffects = $0 }
+                        ))
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                        .labelsHidden()
+                    }
+                }
+
+                // Vị trí popup so với con trỏ — lưới 3x3 + live preview
+                settingsCard {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label(localization.localizedString("popup_position"), systemImage: "macwindow")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.secondary)
+                        Text(localization.localizedString("popup_position_hint"))
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary.opacity(0.7))
+
+                        HStack(alignment: .center, spacing: 18) {
+                            popupPositionGrid
+                            PopupAnchorPreview(anchor: settings.popupAnchor, accent: settings.themedAccent)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.top, 4)
+                    }
+                }
+
+                // Toggle hiện/ẩn dòng thông tin dưới mỗi item
+                settingsCard {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Label(localization.localizedString("show_item_info_line"), systemImage: "info.circle")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.secondary)
+                            Text(localization.localizedString("show_item_info_line_hint"))
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary.opacity(0.8))
+                        }
+                        Spacer()
+                        Toggle("", isOn: Binding(
+                            get: { settings.showItemInfoLine },
+                            set: { settings.showItemInfoLine = $0 }
+                        ))
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                        .labelsHidden()
+                    }
+                }
             }
             .padding(16)
+        }
+    }
+
+    // MARK: - Popup position picker
+
+    /// Ánh xạ (hàng, cột) của lưới 3x3 sang hướng. (1,1) = nil = con trỏ ở tâm.
+    private func popupAnchorAt(row: Int, col: Int) -> PopupAnchor? {
+        switch (row, col) {
+        case (0, 0): return .topLeft
+        case (0, 1): return .top
+        case (0, 2): return .topRight
+        case (1, 0): return .left
+        case (1, 2): return .right
+        case (2, 0): return .bottomLeft
+        case (2, 1): return .bottom
+        case (2, 2): return .bottomRight
+        default: return nil
+        }
+    }
+
+    private var popupPositionGrid: some View {
+        VStack(spacing: 4) {
+            ForEach(0..<3, id: \.self) { row in
+                HStack(spacing: 4) {
+                    ForEach(0..<3, id: \.self) { col in
+                        popupGridCell(row: row, col: col)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func popupGridCell(row: Int, col: Int) -> some View {
+        let cell: CGFloat = 30
+        if let anchor = popupAnchorAt(row: row, col: col) {
+            let isSelected = settings.popupAnchor == anchor
+            Button(action: { settings.popupAnchor = anchor }) {
+                Image(systemName: anchor.iconName)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(isSelected ? .white : .secondary)
+                    .frame(width: cell, height: cell)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(isSelected ? settings.themedAccent : Color(NSColor.controlBackgroundColor))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(isSelected ? settings.themedAccent : Color(NSColor.separatorColor),
+                                    lineWidth: isSelected ? 1.5 : 0.5)
+                    )
+            }
+            .buttonStyle(.plain)
+        } else {
+            // Ô trung tâm = con trỏ chuột
+            Image(systemName: "cursorarrow")
+                .font(.system(size: 12))
+                .foregroundColor(.secondary.opacity(0.6))
+                .frame(width: cell, height: cell)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color(NSColor.separatorColor).opacity(0.5),
+                                style: StrokeStyle(lineWidth: 0.5, dash: [2, 2]))
+                )
         }
     }
 
@@ -507,7 +636,7 @@ struct SettingsView: View {
         }
     }
 
-    /// Load resource từ cả 2 bundle: SwiftPM module bundle (dev build) + main app bundle (release Clipboard.app).
+    /// Load resource từ cả 2 bundle: SwiftPM module bundle (dev build) + main app bundle (release CursorKit.app).
     static func loadResourceImage(named name: String, ext: String) -> NSImage? {
         if let url = Bundle.module.url(forResource: name, withExtension: ext),
            let img = NSImage(contentsOf: url) {
@@ -655,6 +784,134 @@ struct SettingsView: View {
         }
     }
 
+    private var otpSettingsTab: some View {
+        ScrollView {
+            VStack(spacing: 12) {
+                featureToggleRow(
+                    icon: "lock.shield",
+                    titleKey: "otp_feature_enable",
+                    isOn: Binding(
+                        get: { settings.enableOTP },
+                        set: { settings.enableOTP = $0 }
+                    )
+                )
+
+                featureToggleRow(
+                    icon: "externaldrive.badge.timemachine",
+                    titleKey: "otp_auto_backup_enable",
+                    isOn: Binding(
+                        get: { settings.otpAutoBackupEnabled },
+                        set: { settings.otpAutoBackupEnabled = $0 }
+                    )
+                )
+
+                settingsCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label(localization.localizedString("otp_auto_backup_path"), systemImage: "folder")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.secondary)
+
+                        HStack(spacing: 8) {
+                            Text(settings.otpAutoBackupDirectory)
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 5)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(Color(NSColor.textBackgroundColor).opacity(0.5))
+                                )
+
+                            Button(localization.localizedString("choose")) {
+                                chooseOTPBackupDirectory()
+                            }
+                            .controlSize(.small)
+                        }
+                    }
+                }
+
+                settingsCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label(localization.localizedString("otp_auto_backup_interval"), systemImage: "clock.arrow.2.circlepath")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.secondary)
+
+                        Stepper(value: Binding(
+                            get: { settings.otpAutoBackupIntervalHours },
+                            set: { settings.otpAutoBackupIntervalHours = min(max($0, 1), 720) }
+                        ), in: 1...720, step: 1) {
+                            Text(String(format: localization.localizedString("otp_hours_value"), settings.otpAutoBackupIntervalHours))
+                                .font(.system(size: 12, design: .monospaced))
+                        }
+                    }
+                }
+
+                settingsCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label(localization.localizedString("otp_auto_lock_time"), systemImage: "lock.clock")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.secondary)
+
+                        Stepper(value: Binding(
+                            get: { settings.otpGracePeriodMinutes },
+                            set: { settings.otpGracePeriodMinutes = min(max($0, 1), 1440) }
+                        ), in: 1...1440, step: 5) {
+                            Text(String(format: localization.localizedString("otp_minutes_value"), settings.otpGracePeriodMinutes))
+                                .font(.system(size: 12, design: .monospaced))
+                        }
+                    }
+                }
+
+                settingsCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label(localization.localizedString("otp_backup_password_default"), systemImage: "key")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.secondary)
+
+                        HStack(spacing: 8) {
+                            SecureField(localization.localizedString("otp_backup_custom_password_placeholder"),
+                                        text: $customBackupPassword)
+                                .textFieldStyle(.roundedBorder)
+
+                            Button(localization.localizedString("otp_save")) {
+                                OTPBackup.setCustomPassphrase(customBackupPassword)
+                                customBackupPassword = ""
+                                OTPBackup.performAutoBackupIfNeeded(force: true)
+                            }
+                            .controlSize(.small)
+                            .disabled(customBackupPassword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        }
+
+                        Text(OTPBackup.hasCustomPassphrase
+                             ? localization.localizedString("otp_backup_custom_password_set")
+                             : localization.localizedString("otp_backup_custom_password_not_set"))
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "info.circle")
+                        .foregroundColor(settings.themedAccent)
+                    Text(localization.localizedString("otp_auto_backup_hint"))
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(settings.themedAccent.opacity(0.08))
+                )
+            }
+            .padding(16)
+        }
+    }
+
     @ViewBuilder
     private func featureToggleRow(icon: String, titleKey: String, isOn: Binding<Bool>) -> some View {
         settingsCard {
@@ -667,6 +924,18 @@ struct SettingsView: View {
                     .controlSize(.small)
                     .labelsHidden()
             }
+        }
+    }
+
+    private func chooseOTPBackupDirectory() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.directoryURL = URL(fileURLWithPath: settings.otpAutoBackupDirectory, isDirectory: true)
+        if panel.runModal() == .OK, let url = panel.url {
+            settings.otpAutoBackupDirectory = url.path
         }
     }
 
@@ -745,4 +1014,64 @@ struct SettingsView: View {
         .help(theme.displayName)
     }
 
+}
+
+/// Khung minh họa động: con trỏ ở tâm, hộp thoại vẽ theo hướng đang chọn.
+/// Toạ độ SwiftUI có y hướng xuống nên "trên" = y nhỏ hơn tâm.
+struct PopupAnchorPreview: View {
+    let anchor: PopupAnchor
+    let accent: Color
+
+    private let boardW: CGFloat = 150
+    private let boardH: CGFloat = 104
+
+    var body: some View {
+        let pw = boardW * 0.42
+        let ph = boardH * 0.42
+        let cx = boardW / 2
+        let cy = boardH / 2
+
+        let px: CGFloat = {
+            switch anchor.horizontal {
+            case .leading:  return cx - pw
+            case .center:   return cx - pw / 2
+            case .trailing: return cx
+            }
+        }()
+        let py: CGFloat = {
+            switch anchor.vertical {
+            case .top:    return cy - ph   // hộp thoại phía trên con trỏ
+            case .middle: return cy - ph / 2
+            case .bottom: return cy        // hộp thoại phía dưới con trỏ
+            }
+        }()
+
+        return ZStack {
+            // Nền tượng trưng cho màn hình
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(NSColor.windowBackgroundColor))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(NSColor.separatorColor), lineWidth: 0.5)
+                )
+
+            // Hộp thoại lịch sử
+            RoundedRectangle(cornerRadius: 5)
+                .fill(accent.opacity(0.22))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 5).stroke(accent, lineWidth: 1.2)
+                )
+                .frame(width: pw, height: ph)
+                .position(x: px + pw / 2, y: py + ph / 2)
+
+            // Con trỏ chuột ở tâm
+            Image(systemName: "cursorarrow")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundColor(.primary)
+                .shadow(color: Color(NSColor.windowBackgroundColor), radius: 1)
+                .position(x: cx, y: cy)
+        }
+        .frame(width: boardW, height: boardH)
+        .animation(.easeInOut(duration: 0.18), value: anchor)
+    }
 }

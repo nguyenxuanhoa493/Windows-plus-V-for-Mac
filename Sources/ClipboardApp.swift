@@ -19,6 +19,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var virtualWindow: NSPanel?
     var eventMonitor: Any?
     var hotKey: HotKey?
+    /// Tạm "ghim" popup: bỏ qua việc tự đóng khi click ra ngoài (vd đang chọn file QR).
+    static var suppressDismiss = false
     private var clipboardManager = ClipboardManager.shared
     
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -30,12 +32,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         
         print("DEBUG: Ứng dụng đang khởi động...")
-        
-        // Kiểm tra quyền truy cập trợ năng
+
+        #if DEBUG
+        OTPItem.runSelfCheck()
+        OTPCrypto.runSelfCheck()
+        #endif
+
+        // Detect stale TCC sau update: ad-hoc signed app có CDHash đổi mỗi build →
+        // csreq trong TCC.db không match → toggle UI hiện ON nhưng AXIsProcessTrusted=false.
+        // Reset entry để user cấp quyền lại từ đầu (consistent UX).
+        let currentVersion = UpdateManager.shared.currentVersion
+        let lastSeenVersion = UserDefaults.standard.string(forKey: "lastSeenVersion")
         let hasAccessibility = AXIsProcessTrusted()
-        print("DEBUG: Trạng thái quyền truy cập: \(hasAccessibility)")
-        
-        if !hasAccessibility {
+        print("DEBUG: Trạng thái quyền truy cập: \(hasAccessibility), version: \(lastSeenVersion ?? "nil") → \(currentVersion)")
+
+        if !hasAccessibility, let last = lastSeenVersion, last != currentVersion {
+            print("DEBUG: Phát hiện stale TCC sau update \(last) → \(currentVersion), reset entry...")
+            resetAccessibilityTCC()
+        }
+        UserDefaults.standard.set(currentVersion, forKey: "lastSeenVersion")
+
+        if !AXIsProcessTrusted() {
             // Hiển thị popup yêu cầu quyền
             print("DEBUG: Không có quyền Accessibility, hiển thị popup...")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -48,6 +65,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Khởi tạo clipboard manager
         clipboardManager.startMonitoring()
+
+        // Khởi tạo backup OTP tự động.
+        OTPBackup.startAutoBackupMonitoring()
         
         // Tạo menu trên thanh trạng thái
         setupStatusItem()
@@ -78,6 +98,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Theme đổi → cập nhật backgroundColor (titlebar) cho popup nếu đang mở
         NotificationCenter.default.addObserver(self, selector: #selector(themeDidChange),
             name: .themeDidChange, object: nil)
+
+        // OTP bật/tắt → rebuild status menu để hiện/ẩn mục "Quản lý OTP"
+        NotificationCenter.default.addObserver(self, selector: #selector(otpSettingChanged),
+            name: .otpSettingChanged, object: nil)
         
         // Tự động kiểm tra cập nhật (silent)
         if Settings.shared.autoCheckForUpdates {
@@ -85,7 +109,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 UpdateManager.shared.checkForUpdates(silent: true)
             }
         }
-        
+
+        // Lần đầu mở app → mở luôn cửa sổ Cài đặt cho user.
+        // Delay 0.6s để hiện sau popup Accessibility (0.5s) → Settings nằm trên cùng.
+        if !UserDefaults.standard.bool(forKey: "hasLaunchedBefore") {
+            UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                self?.openSettings()
+            }
+        }
+
         print("DEBUG: Ứng dụng đã khởi động xong")
     }
     
@@ -93,7 +126,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "clipboard", accessibilityDescription: "Clipboard")
+            // SF Symbol "clipboard" chỉ có từ macOS 13 → trên macOS 12 trả về nil khiến
+            // icon menu bar biến mất. Fallback "doc.on.clipboard" (có từ macOS 10.15),
+            // cuối cùng dùng ký tự text để luôn hiển thị được icon.
+            if let image = NSImage(systemSymbolName: "cursorarrow.click.2", accessibilityDescription: "CursorKit")
+                ?? NSImage(systemSymbolName: "cursorarrow", accessibilityDescription: "CursorKit")
+                ?? NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "CursorKit") {
+                button.image = image
+            } else {
+                button.title = "📋"
+            }
             button.target = self
             button.action = #selector(statusItemClicked(_:))
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -142,8 +184,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupHotKey() // Cập nhật lại phím tắt khi có thay đổi
     }
 
+    @objc private func otpSettingChanged() {
+        setupMenu() // Rebuild menu khi bật/tắt OTP
+    }
+
+    /// Reset TCC entry cho Accessibility — dùng khi detect stale entry sau update
+    /// (CDHash đổi → signature requirement không match → toggle UI ON nhưng kernel reject).
+    /// Sau reset, user cấp lại quyền sẽ tạo entry mới với CDHash hiện tại.
+    private func resetAccessibilityTCC() {
+        let bundleId = Bundle.main.bundleIdentifier ?? "com.xuanhoa.cursorkit"
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+        process.arguments = ["reset", "Accessibility", bundleId]
+        do {
+            try process.run()
+            process.waitUntilExit()
+            print("DEBUG: tccutil reset Accessibility \(bundleId) — exit \(process.terminationStatus)")
+        } catch {
+            print("DEBUG: tccutil reset error: \(error)")
+        }
+    }
+
     @objc private func themeDidChange() {
-        virtualWindow?.backgroundColor = NSColor(Settings.shared.themedBackground)
+        virtualWindow?.backgroundColor = .clear
     }
 
     @objc private func settingsWindowDidShow(_ note: Notification) {
@@ -168,7 +231,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Anchored mode: lower level để Settings có thể front-most khi user click
         panel.level = .floating
-        panel.backgroundColor = NSColor(Settings.shared.themedBackground)
+        panel.backgroundColor = .clear
 
         let origin = positionRight(of: anchor, panelSize: popoverSize)
         panel.setFrame(NSRect(origin: origin, size: popoverSize), display: false)
@@ -248,6 +311,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }, onToggleBookmark: { [weak self, weak panel] item in
             self?.clipboardManager.toggleBookmark(item)
             if let panel = panel { self?.applyPanelContent(to: panel) }
+        }, onPasteOTP: { [weak self, weak panel] code in
+            panel?.close()
+            self?.handleOTPPaste(code)
         })
         let hostingView = NSHostingView(rootView: view)
         hostingView.frame = NSRect(origin: .zero, size: popoverSize)
@@ -333,7 +399,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         SettingsWindow.shared.show()
         print("DEBUG: Cửa sổ cài đặt đã được mở")
     }
-    
+
     @objc func checkForUpdates() {
         UpdateManager.shared.checkForUpdates()
     }
@@ -359,13 +425,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             backing: .buffered,
             defer: false
         )
-        panel.title = "Clipboard"
+        panel.title = "CursorKit"
         panel.isFloatingPanel = true
         panel.level = .popUpMenu
         panel.hidesOnDeactivate = false
         panel.isMovableByWindowBackground = false
         // Titlebar trong suốt → kế thừa backgroundColor → custom theme phủ luôn lên titlebar
         panel.titlebarAppearsTransparent = true
+        // Liquid Glass: cửa sổ trong suốt để NSVisualEffectView (behind-window) hiện hiệu ứng kính.
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
         panel.standardWindowButton(.closeButton)?.isHidden = false
         panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
         panel.standardWindowButton(.zoomButton)?.isHidden = true
@@ -382,10 +451,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let mouseLocation = NSEvent.mouseLocation
 
-        // Mặc định: cửa sổ nằm ngay bên dưới và bên phải con trỏ
-        // (NSWindow origin = góc bottom-left → top-left = cursor)
-        var popoverOriginX = mouseLocation.x
-        var popoverOriginY = mouseLocation.y - popoverSize.height
+        // Vị trí popup so với con trỏ theo cấu hình của user (mặc định dưới-phải).
+        // Sau đó vẫn kẹp lại trong màn hình bên dưới để không tràn ra ngoài.
+        let anchorOrigin = Settings.shared.popupAnchor.origin(cursor: mouseLocation, size: popoverSize)
+        var popoverOriginX = anchorOrigin.x
+        var popoverOriginY = anchorOrigin.y
 
         // Giới hạn trong màn hình chứa con trỏ (dùng visibleFrame để tránh đè menu bar / dock)
         let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) }) ?? NSScreen.main
@@ -410,7 +480,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Cursor mode: level cao để stay-on-top, click outside dismiss
         panel.level = .popUpMenu
-        panel.backgroundColor = NSColor(Settings.shared.themedBackground)
+        panel.backgroundColor = .clear
 
         panel.setFrame(
             NSRect(x: popoverOriginX, y: popoverOriginY, width: popoverSize.width, height: popoverSize.height),
@@ -418,25 +488,71 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         applyPanelContent(to: panel)
+        // Animation hiện: mờ dần (kiểu macOS).
+        panel.alphaValue = 0
         panel.makeKeyAndOrderFront(nil)
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.16
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().alphaValue = 1
+        }
 
         let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self, weak panel] event in
+            if AppDelegate.suppressDismiss { return }
             if let panel = panel, panel.isVisible {
                 let mouseLocation = NSEvent.mouseLocation
                 if !panel.frame.contains(mouseLocation) {
-                    panel.close()
+                    self?.fadeOutAndClose(panel)
                     self?.removeEventMonitor()
                 }
             }
         }
         eventMonitor = monitor
     }
+
+    /// Animation biến mất: mờ dần rồi đóng (reset alpha để tái dùng panel).
+    func fadeOutAndClose(_ panel: NSWindow) {
+        guard panel.isVisible else { panel.close(); return }
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.14
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            panel.animator().alphaValue = 0
+        }, completionHandler: {
+            panel.close()
+            panel.alphaValue = 1
+        })
+    }
     
+    /// Paste 1 mã OTP: copy vào pasteboard rồi auto-paste. ignoreNextChange()
+    /// để mã KHÔNG lọt vào lịch sử clipboard (vốn lưu plaintext).
+    private func handleOTPPaste(_ code: String) {
+        removeEventMonitor()
+        if let window = virtualWindow { fadeOutAndClose(window) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            self.clipboardManager.ignoreNextChange()
+            let pb = NSPasteboard.general
+            pb.clearContents()
+            pb.setString(code, forType: .string)
+            // ⌘V synthesis — match ClipboardItem.paste() chính xác
+            guard let source = CGEventSource(stateID: .hidSystemState) else { return }
+            let cmdDown = CGEvent(keyboardEventSource: source, virtualKey: 0x37, keyDown: true)
+            let vDown = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true)
+            let vUp = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false)
+            let cmdUp = CGEvent(keyboardEventSource: source, virtualKey: 0x37, keyDown: false)
+            vDown?.flags = .maskCommand
+            vUp?.flags = .maskCommand
+            cmdDown?.post(tap: .cghidEventTap)
+            vDown?.post(tap: .cghidEventTap)
+            vUp?.post(tap: .cghidEventTap)
+            cmdUp?.post(tap: .cghidEventTap)
+        }
+    }
+
     private func handleItemSelected(_ item: ClipboardItem) {
-        // Đóng cửa sổ trước
+        // Đóng cửa sổ trước (mờ dần)
         removeEventMonitor()
         if let window = virtualWindow {
-            window.close()
+            fadeOutAndClose(window)
         }
         
         // Đợi window đóng và app ban đầu được focus trở lại
